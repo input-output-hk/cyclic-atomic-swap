@@ -1,0 +1,212 @@
+% ── HTLC-based swaps ─────────────────────────────────────────────────────────
+
+@inproceedings{herlihy2018atomic,
+  author    = {Maurice Herlihy},
+  title     = {Atomic Cross-Chain Swaps},
+  booktitle = {Proceedings of the 2018 ACM Symposium on Principles of
+               Distributed Computing (PODC~'18)},
+  year      = {2018},
+  pages     = {245--254},
+  publisher = {ACM}
+}
+
+@inproceedings{clark2024htlc,
+  author    = {Daniel Clark and Chryssis Georgiou and Ethan Poon and
+               Marek Chrobak},
+  title     = {On {HTLC}-Based Protocols for Multi-Party Cross-Chain Swaps},
+  booktitle = {Proceedings of the 35th International Symposium on Algorithms
+               and Computation (ISAAC~2024)},
+  year      = {2024},
+  series    = {LIPIcs},
+  note      = {Also available as arXiv:2403.03906}
+}
+
+% ── Adaptor-signature swaps ──────────────────────────────────────────────────
+
+@misc{you2024multiparty,
+  author    = {Shengewei You and Aditya Joshi and Andrey Kuehlkamp and
+               Jarek Nabrzyski},
+  title     = {A Multi-Party, Multi-Blockchain Atomic Swap Protocol with
+               Universal Adaptor Secret},
+  year      = {2024},
+  note      = {arXiv:2406.16822; presented at ACM CCS~'24}
+}
+
+@misc{gugger2020btcxmr,
+  author    = {Joel Gugger},
+  title     = {Bitcoin--Monero Cross-chain Atomic Swap},
+  year      = {2020},
+  note      = {IACR ePrint 2020/1126}
+}
+
+@inproceedings{kajita2024consecutive,
+  author    = {Kento Kajita and Go Ohtake and Tsuyoshi Takagi},
+  title     = {Consecutive Adaptor Signature Scheme: From Two-Party to
+               {N}-Party Settings},
+  booktitle = {Provable and Practical Security (ProvSec~2024)},
+  year      = {2024},
+  note      = {Also available as IACR ePrint 2024/241}
+}
+
+@inproceedings{gerhart2024foundations,
+  author    = {Lukas Gerhart and Dominique Schr\"oder and Pratik Soni and
+               Sri Aravinda Krishnan Thyagarajan},
+  title     = {Foundations of Adaptor Signatures},
+  booktitle = {Advances in Cryptology -- EUROCRYPT~2024},
+  year      = {2024},
+  series    = {LNCS},
+  volume    = {14654},
+  publisher = {Springer}
+}
+
+@inproceedings{tu2022ecdsa,
+  author    = {Yuhao Tu and Zhonghui Zhang and Huili Chen},
+  title     = {Efficient {ECDSA}-based Adaptor Signature for Batched
+               Atomic Swaps},
+  booktitle = {Information Security (ISC~2022)},
+  year      = {2022},
+  series    = {LNCS},
+  volume    = {13640},
+  publisher = {Springer},
+  note      = {Also available as IACR ePrint 2024/140}
+}
+
+% ── Alternative mechanisms ───────────────────────────────────────────────────
+
+@inproceedings{thyagarajan2022universal,
+  author    = {Sri Aravinda Krishnan Thyagarajan and Giulio Malavolta and
+               Pedro Moreno-Sanchez},
+  title     = {Universal Atomic Swaps: Secure Exchange of Coins Across All
+               Blockchains},
+  booktitle = {IEEE Symposium on Security and Privacy (S\&P~2022)},
+  year      = {2022}
+}
+
+@inproceedings{xiao2025paraswap,
+  author    = {Danlei Xiao and others},
+  title     = {Parallelizing Universal Atomic Swaps for Multi-Chain
+               Cryptocurrency Exchanges},
+  booktitle = {USENIX Security Symposium 2025},
+  year      = {2025}
+}
+
+@inproceedings{manevich2022notime,
+  author    = {Maxim Manevich and Adi Akavia},
+  title     = {Cross Chain Atomic Swaps in the Absence of Time via
+               Attribute Verifiable Timed Commitments},
+  booktitle = {IEEE European Symposium on Security and Privacy
+               (EuroS\&P~2022)},
+  year      = {2022},
+  pages     = {606--625}
+}
+
+@misc{dubler2025atg,
+  author    = {Nicholas Dubler and Luca Badaloni and Pedro Moreno-Sanchez
+               and Clara Schneidewind},
+  title     = {Atomic Transfer Graphs: Secure-by-design Protocols for
+               Heterogeneous Blockchain Ecosystems},
+  year      = {2025},
+  note      = {IEEE S\&P 2025; arXiv:2501.17786}
+}
+
+% ── Building blocks ──────────────────────────────────────────────────────────
+
+@inproceedings{nick2021musig2,
+  author    = {Jonas Nick and Tim Ruffing and Yannick Seurin},
+  title     = {{MuSig2}: Simple Two-Round {Schnorr} Multi-Signatures},
+  booktitle = {Advances in Cryptology -- CRYPTO~2021},
+  year      = {2021},
+  note      = {Also published as BIP~327}
+}
+
+@inproceedings{aumayr2021channels,
+  author    = {Lukas Aumayr and Oguzhan Ersoy and Andreas Erwig and
+               Sebastian Faust and Kristina Hostakova and Matteo Maffei and
+               Pedro Moreno-Sanchez and Siavash Riahi},
+  title     = {Generalized Channels from Limited Blockchain Scripts and
+               Adaptor Signatures},
+  booktitle = {Advances in Cryptology -- ASIACRYPT~2021},
+  year      = {2021},
+  series    = {LNCS},
+  volume    = {13091},
+  pages     = {635--664},
+  publisher = {Springer}
+}
+
+% ── Race conditions / double-claiming ────────────────────────────────────────
+
+@inproceedings{ni2024pipeswap,
+  author    = {Peifang Ni and Anqi Tian and Jing Xu},
+  title     = {Warning! The Timeout {T} Cannot Protect You From Losing Coins:
+               {PipeSwap}: Forcing the Timely Release of a Secret for Atomic
+               Cross-Chain Swaps},
+  year      = {2024},
+  note      = {IACR ePrint 2024/881}
+}
+
+@inproceedings{chung2022rapidash,
+  author    = {Hao Chung and Elisaweta Masserova and Elaine Shi and
+               Sri AravindaKrishnan Thyagarajan},
+  title     = {{Rapidash}: Atomic Swaps Secure Under User-Miner Collusion},
+  year      = {2022},
+  note      = {IACR ePrint 2022/1063}
+}
+
+% ── Fairness / optionality ───────────────────────────────────────────────────
+
+@inproceedings{han2019optionality,
+  author    = {Runchao Han and Haoyu Lin and Jiangshan Huang and
+               Zhimei Zhang and Hong Zhu},
+  title     = {On the Optionality and Fairness of Atomic Swaps},
+  booktitle = {Proceedings of the First ACM Conference on Advances in
+               Financial Technologies (AFT~'19)},
+  year      = {2019},
+  publisher = {ACM},
+  note      = {Also available as IACR ePrint 2019/896}
+}
+
+% ── Deployed implementations ─────────────────────────────────────────────────
+
+@misc{comit,
+  author    = {{COMIT Network}},
+  title     = {xmr-btc-swap},
+  year      = {2021},
+  note      = {\url{https://github.com/comit-network/xmr-btc-swap};
+               mainnet since May 2021}
+}
+
+@misc{farcaster,
+  author    = {{Farcaster Project}},
+  title     = {Farcaster {RFCs}},
+  year      = {2022},
+  note      = {\url{https://github.com/farcaster-project/RFCs}}
+}
+
+@misc{loop2025,
+  author    = {{Lightning Labs}},
+  title     = {Loop: {MuSig2} Integration},
+  year      = {2025},
+  note      = {\url{https://lightning.engineering/posts/2025-02-13-loop-musig2/}}
+}
+
+% ── Formal verification ─────────────────────────────────────────────────────
+
+@inproceedings{nehai2022tlaplus,
+  author    = {Zeinab Nehai and Fran\c{c}ois Bobot and Pierre-Yves Tucci
+               and Carole Delporte-Gallet and Hugues Fauconnier},
+  title     = {A {TLA+} Formal Proof of a Cross-Chain Swap},
+  booktitle = {Proceedings of the 23rd International Conference on
+               Distributed Computing and Networking (ICDCN~2022)},
+  year      = {2022},
+  publisher = {ACM}
+}
+
+@inproceedings{vandermeyden2019verification,
+  author    = {Ron van der Meyden},
+  title     = {On the Specification and Verification of Atomic Swap Smart
+               Contracts},
+  booktitle = {IEEE International Conference on Blockchain and
+               Cryptocurrency (ICBC~2019)},
+  year      = {2019},
+  note      = {Also available as arXiv:1811.06099}
+}
