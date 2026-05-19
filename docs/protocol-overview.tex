@@ -1,0 +1,404 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[top=2.5cm, bottom=2.5cm, left=2.8cm, right=2.8cm]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+
+% ── Colours ──────────────────────────────────────────────────────────────────
+\definecolor{protoblue}{HTML}{1a4f7a}
+\definecolor{rulecolor}{HTML}{1a4f7a}
+
+% ── Section formatting ────────────────────────────────────────────────────────
+\titleformat{\section}
+  {\large\bfseries\color{protoblue}}
+  {\thesection}{1em}{}[\color{rulecolor}\titlerule]
+\titleformat{\subsection}
+  {\normalsize\bfseries\color{protoblue}}
+  {\thesubsection}{1em}{}
+\titlespacing{\section}{0pt}{1.4em}{0.6em}
+\titlespacing{\subsection}{0pt}{1em}{0.4em}
+
+% ── Lists ─────────────────────────────────────────────────────────────────────
+\setlist[itemize]{itemsep=2pt,topsep=4pt,leftmargin=1.4em}
+\setlist[enumerate]{itemsep=2pt,topsep=4pt,leftmargin=1.6em}
+
+% ── Header / footer ──────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{gray}N-Party Cyclic Atomic Swap --- Overview}
+\fancyhead[R]{\small\color{gray}\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+
+% ── Hyperlinks ────────────────────────────────────────────────────────────────
+\hypersetup{
+  colorlinks=true,
+  linkcolor=protoblue,
+  urlcolor=protoblue,
+  pdftitle={N-Party Cyclic Atomic Swap --- Overview and Assumptions}
+}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+% ── Title ────────────────────────────────────────────────────────────────────
+\begin{titlepage}
+\centering
+\vspace*{2.5cm}
+{\huge\bfseries\color{protoblue}
+  N-Party Cyclic Atomic Swap\par}
+\vspace{0.6cm}
+{\Large\color{black}
+  Overview and Assumptions\par}
+\vspace{0.4cm}
+{\large\color{gray}
+  For stakeholders\par}
+\vspace{1.0cm}
+\color{rulecolor}\rule{0.8\textwidth}{1.2pt}
+\vfill
+{\normalsize\color{gray}\today}
+\end{titlepage}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Protocol Overview}
+
+This protocol allows $N$ parties to simultaneously exchange assets across
+different blockchains, without any trusted intermediary.
+The parties form a directed cycle: each party deposits funds that the next
+party in the cycle can claim, and in turn claims the funds deposited by the
+previous party.
+
+\medskip\noindent\textbf{Example.}\;
+Three parties $A$, $B$, $C$ want to trade:
+$A$ sends Bitcoin to $B$, $B$ sends Cardano ADA to $C$, $C$ sends Bitcoin
+to $A$.
+The protocol guarantees that under certain assumptions (discussed below) 
+either \emph{all three transfers happen} or
+\emph{none of them do}: no party can lose funds unless they violate their
+own obligations.
+
+\subsection*{How It Works}
+
+\begin{enumerate}
+  \item \textbf{Agree.}\;
+    All parties agree on the swap terms: who trades what with whom, and the
+    safety timing parameters (refund windows).
+    One party is designated the \textbf{leader}.
+
+  \item \textbf{Prepare.}\;
+    Through a series of message exchanges, the parties jointly construct
+    three transactions per transfer:
+    a \emph{deposit} (locks funds on-chain),
+    a \emph{withdraw} (lets the recipient claim those funds), and
+    a \emph{refund} (lets the depositor reclaim if the swap fails).
+    The withdraw transaction is incomplete at this stage: it requires a
+    shared secret that no single party possesses.
+
+  \item \textbf{Lock.}\;
+    Each party broadcasts their deposit transaction.
+    Funds are now locked on-chain and can only move via the pre-arranged
+    withdraw or refund transactions.
+
+  \item \textbf{Claim.}\;
+    The leader collects secret shares from all other parties, completes the
+    first withdraw transaction, and broadcasts it on-chain.
+    This broadcast publicly reveals the shared secret.
+    All other parties extract the secret from the blockchain and complete
+    their own withdraw transactions.
+
+  \item \textbf{Refund (if anything goes wrong).}\;
+    If the leader never broadcasts the first withdraw, each party's refund
+    transaction becomes valid after a pre-agreed block height.
+    Every party reclaims their own deposit.
+    Refund windows are staggered so that no party can simultaneously
+    collect a withdraw and a refund.
+\end{enumerate}
+
+The key mechanism is that the act of claiming funds on one chain
+\emph{automatically reveals} the information needed for all other parties
+to claim on their respective chains.
+This is achieved through adaptor signatures, a cryptographic technique that
+ties the validity of a signature to the disclosure of a secret.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Assumptions and Their Implications}
+\label{sec:assumptions}
+
+The protocol's safety guarantees hold only when certain assumptions are met.
+This section lists each assumption, explains why it is needed, and
+describes the consequences when it is violated.
+
+\subsection{Cyclic Swap Topology}
+
+\textbf{Assumption.}\;
+The parties must form a single directed cycle: each party deposits into
+exactly one transfer and claims from exactly one transfer.
+
+\textbf{Why.}\;
+The staggered refund-window mechanism that prevents double-spending
+(collecting both a withdraw and a refund) relies on a strict linear
+ordering of the parties.
+In non-cyclic topologies (e.g.\ a party that deposits into two transfers),
+this mechanism wouldn't work.
+
+\textbf{Implication.}\;
+The protocol cannot express arbitrary multi-party trades.
+%Any trade must be decomposable into a single cycle.
+
+\subsection{Timely Chain Access}
+
+\textbf{Assumption.}\;
+Every party must have \textbf{timely chain access} throughout the protocol:
+the ability to both \emph{read} the current state of every relevant
+blockchain and \emph{write} transactions that are included in a block,
+all within a bounded number of blocks.
+
+Specifically, after the trigger transaction is broadcast, each non-leader
+party must be able to (1)~observe the trigger at the required finality
+depth, (2)~construct and sign their own withdraw transaction, and
+(3)~have that transaction confirmed --- all within $\Delta$ blocks (the
+\textbf{claim propagation time}).
+
+\textbf{Why.}\;
+The protocol does not tolerate situations where a party is unable to
+interact with the chain in time.
+Both consistency (all parties see the same chain state) and availability
+(all parties can get transactions included) are required.
+
+\textbf{What can break timely chain access:}
+\begin{itemize}
+  \item \textbf{Party downtime} --- node crash, key unavailability,
+    operator error.
+
+  \item \textbf{Network-level censorship} --- miners or validators
+    selectively exclude a party's transactions from blocks.
+    On PoW chains a mining cartel can censor; on PoS chains a colluding
+    validator set can achieve the same effect.
+
+  \item \textbf{Chain congestion} --- sustained high demand delays
+    transaction inclusion beyond $\Delta$ blocks even without targeted
+    censorship.
+    This is economically equivalent to censorship.
+
+  \item \textbf{Network partitions} --- a party is unable to communicate
+    with blockchain nodes despite being locally operational.
+
+  \item \textbf{Chain reorganisation} --- a confirmed transaction is
+    reversed, resetting the party's view of finality and potentially
+    consuming $\Delta$ blocks before re-confirmation.
+\end{itemize}
+
+\textbf{Implication.}\;
+A party that loses chain access after the Lock phase risks losing its
+deposit: another party may claim the locked funds via the withdraw path,
+while the affected party cannot claim its own output.
+In practice, parties should use monitoring infrastructure (watchtowers,
+redundant nodes) and $\Delta$ must be set conservatively for worst-case
+inclusion delays.
+The protocol offers no defence against a censoring majority of block
+producers collaborating with a malicious participant.
+
+\subsection{Sufficient Refund Window Gaps}
+
+\textbf{Assumption.}\;
+Adjacent refund windows must be separated by at least $\Delta$ blocks:
+$W_i - W_{i+1} \geq \Delta$ for all $i$.
+
+\textbf{Why.}\;
+If the gap is too small, a malicious leader can time the trigger broadcast
+so that a party's refund window opens before it has had enough time to
+confirm its withdraw transaction.
+The victim refunds their own deposit (believing the swap failed), but the
+leader also claims the victim's locked funds via the withdraw path.
+The victim loses their deposit and receives nothing.
+Any of the threats to timely chain access listed in the previous section
+can cause the effective propagation time to exceed $\Delta$.
+
+\textbf{Implication.}\;
+The total lock-up time grows linearly with $N$: the leader's refund window
+must be at least $(N{-}1) \times \Delta$ blocks after the earliest window.
+Choosing $\Delta$ is a trade-off between safety and capital efficiency;
+\textbf{underestimating $\Delta$ is a safety-critical error.}
+$\Delta$ should be computed per chain-pair (using the worst case) and
+agreed upon by all parties in the Config phase.
+
+\subsection{Chain Finality}
+
+\textbf{Assumption.}\;
+The protocol treats ``transaction confirmed'' as a binary oracle.
+The definition of finality (e.g.\ number of confirmations) is
+chain-specific and external to the protocol.
+
+\textbf{Implication.}\;
+A chain reorganisation that reverses a confirmed deposit after the claim
+phase has begun can break atomicity irrecoverably.
+Cross-chain swaps are only as safe as the weakest finality guarantee among
+the chains involved.
+
+\subsection{Schnorr-Compatible Signatures}
+
+\textbf{Assumption.}\;
+All participating blockchains must support Schnorr-compatible signature
+verification (or an equivalent via smart contracts).
+
+\textbf{Why.}\;
+The protocol relies on adaptor signatures, which require the algebraic
+structure of Schnorr signatures (specifically, the linearity of nonce
+randomisation).
+ECDSA-based adaptor signatures exist but have different security properties
+and are less mature.
+
+\textbf{Implication.}\;
+Bitcoin supports Schnorr natively since Taproot (November 2021).
+Cardano uses EdDSA natively, which is not directly compatible; a
+smart-contract bridge is required to verify Schnorr signatures on Cardano.
+Chains without Schnorr support or smart-contract capability cannot
+participate.
+
+\subsection{Cryptographic Soundness}
+
+\textbf{Assumption.}\;
+The adaptor signature scheme, the MuSig2 multi-signature scheme, and their
+composition are assumed correct and secure.
+
+\textbf{Why.}\;
+If the underlying cryptography is broken (e.g.\ an adversary can forge
+adaptor signatures or extract the aggregate secret without the trigger),
+the protocol's guarantees are void.
+
+\textbf{Implication.}\;
+MuSig2 has a published security proof, but the composition of MuSig2 with
+adaptor signatures in the specific way this protocol uses them has not been
+independently verified in a peer-reviewed setting.
+This is a residual cryptographic risk.
+
+\subsection{Mutual Exclusion of Withdraw and Refund}
+
+\textbf{Assumption.}\;
+For each transfer, at most one of the withdraw and refund transactions can
+be confirmed.
+Once one succeeds, the other is permanently invalid.
+
+\textbf{Why.}\;
+Without this guarantee, a party could collect both: claim the withdraw
+(receiving the counterparty's funds) and then also claim the refund
+(recovering their own deposit), stealing funds outright.
+
+\textbf{Implication.}\;
+On UTXO-based chains (Bitcoin, Cardano) this holds by construction:
+spending a UTXO consumes it.
+On account-based chains (e.g.\ Ethereum), a smart contract must
+explicitly enforce this exclusion.
+Any chain integration must be audited for this property.
+
+\subsection{Griefing and Optionality}
+\label{sec:griefing}
+
+\textbf{Assumption.}\;
+The protocol guarantees that no honest party loses principal, but it does
+not prevent an adversary from forcing all parties to wait out their refund
+windows, nor does it prevent the leader from exploiting the temporal gap
+between commitment and completion.
+
+\textbf{Why --- griefing.}\;
+Any party can abort after the Lock phase by simply withholding their
+adaptor secret.
+All parties eventually recover their deposits via refund, but their funds
+are locked until each party's refund window opens.
+
+\textbf{Why --- optionality.}\;
+Between the Lock phase (all funds committed on-chain) and the leader's
+decision to broadcast the trigger, time passes and asset prices move.
+The leader can observe these movements and choose to complete the swap (if
+prices moved in their favour) or let it expire via refund (if prices moved
+against them).
+The non-leader parties are locked in and cannot exit.
+Han et al.~\cite{han2019optionality} prove that this is structurally
+equivalent to a premium-free American call option granted to the leader at
+the non-leaders' expense, and estimate the fair option premium at 2--3\%
+of the swap value for typical cryptocurrency volatility.
+This is a structural property of all
+atomic swap protocols in which one party
+commits last.
+
+\textbf{Implication.}\;
+Griefing imposes asymmetric costs: a party with an early refund window can
+force the leader to wait at low cost to themselves.
+Optionality transfers expected value from non-leaders to the leader, since
+the leader can choose to complete or abort based on price movements.
+The protocol has no built-in penalty for griefing and no premium mechanism
+for optionality; mitigation (reputation systems, bonds, trigger deadlines,
+option premiums) is outside the protocol scope.
+
+\subsection{No Upper Bound on Transaction Validity}
+
+\textbf{Assumption.}\;
+Bitcoin (and most blockchains) only support a \emph{lower} bound on when a
+transaction becomes valid (``not before block $n$''), not an upper bound
+(``not after block $m$'').
+
+\textbf{Why.}\;
+This means that once a withdraw transaction is valid, it remains valid
+\emph{forever}.
+There is no way to make it expire.
+
+\textbf{Implication.}\;
+Once the refund window opens, both withdraw and refund are simultaneously
+valid (mutual exclusion ensures only one succeeds).
+A party must broadcast their refund promptly; delay risks the counterparty
+completing the withdraw first.
+This reinforces the timely chain access requirement (Section~2.2).
+
+\subsection{Pre-Determined Leader}
+
+\textbf{Assumption.}\;
+One party is designated as the leader before the protocol begins.
+The leader triggers the claim phase by broadcasting the first withdraw
+transaction.
+
+\textbf{Why.}\;
+The refund windows are anchored to the leader's position: the leader's
+refund window opens last, giving all other parties the maximum time to
+observe the trigger and claim.
+Changing the leader mid-protocol would invalidate the window ordering.
+
+\textbf{Implication.}\;
+Leader selection must happen out-of-band or via a pre-protocol election
+mechanism (not specified).
+The leader role carries both costs and benefits:
+\begin{itemize}
+  \item \textbf{Cost:}\;
+    The leader's funds are locked for the longest duration, and the leader
+    bears the highest opportunity cost if the swap is aborted (see
+    Section~\ref{sec:griefing}).
+  \item \textbf{Benefit:}\;
+    The leader holds the free option described in
+    Section~\ref{sec:griefing}: they can observe price movements after all
+    funds are locked and choose whether to complete or abort.
+    This optionality transfers expected value from non-leaders to the
+    leader.
+\end{itemize}
+These two effects pull in opposite directions: griefing risk discourages
+taking the leader role, while optionality rewards it.
+Whether the net incentive is positive or negative depends on asset
+volatility, lock-up duration, and the number of parties.
+The protocol does not balance these incentives; rational leader selection
+is an open design problem.
+
+% Note that this is a protocol-design choice rather than a fundamental
+% limitation: a leader election mechanism
+% could be layered on top without changing the core protocol.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
