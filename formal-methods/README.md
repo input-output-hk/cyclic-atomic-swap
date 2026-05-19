@@ -17,14 +17,12 @@ spec/
   types.qnt                  # Party, Phase, AssetStatus
   spells/                    # Quint stdlib helpers
   model-checking-notes.md    # how the model was adapted for verify
-  layer2-plan.md             # planning notes for the next refactor (selective sends)
   README.md                  # this file
   scripts/
     run-profile.sh           # one HONEST profile, all checks
     verify-all.sh            # sweep all 7 profiles
   results/
     summary.tsv              # written by run-profile.sh
-  old-spec/                  # frozen original (concrete network) model
 ```
 
 ## Verifying the model
