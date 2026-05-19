@@ -1,8 +1,42 @@
 # 6. Runtime View
 
+## 6.1 Daemon
+
+[`types::Daemon`](../../swap-daemon/src/daemon.rs)
+
+```mermaid
+flowchart TD
+    new("new")
+    insert_session("insert_session(session: SwapSession)")
+    start_swap_session("start_swap_session(session_id: u64)")
+    run("run()")
+    %% Connect
+    listener.accept("
+        tokio::spawn ({
+        loop {
+        listener.accept() {
+    ")
+    handle_connection("
+        networking::handleConnection(socket: TcpStream, from: String, event_tx: mpsc::Sender<DaemonEvent>)
+    ")
+    
+    new --> insert_session
+    insert_session --> start_swap_session
+    start_swap_session --> run
+    run -- spawn --> listener.accept
+    subgraph connect
+        listener.accept --> listener.accept
+        listener.accept -- spawn --> handle_connection
+    end
+    
+    
+    
+```
+    
+---
+
 This phase runs concurrently for all N refund roles and all N spend roles (2N `TxRole` instances).
 The sub-protocol for each role is a standard two-round MuSig2 exchange:
-
 
 ```mermaid
 ---
