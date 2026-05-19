@@ -1,4 +1,4 @@
-DOCS := protocol-spec protocol-overview protocol-comparison fast-refund
+DOCS := protocol-spec protocol-overview
 PDFS := $(addsuffix .pdf,$(DOCS))
 
 .PHONY: all clean
