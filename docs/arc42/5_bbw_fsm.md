@@ -1,0 +1,718 @@
+# 5 Building Blocks View – Protocol Finite State Machine
+
+```mermaid
+---
+title: Protocol Finite State Machine
+---
+flowchart TD
+%% Config    
+    start([
+        <b>Start</b>
+    ])
+    init_daemon["
+        <i>initialize daemon</i>
+        
+        blockchain {bitcoin | cardano}
+        network address
+        x<sub>i</sub>, X<sub>i</sub>
+        -
+        </code>daemon::Daemon::new(...)</code>
+    "]
+    init_daemon_note[
+        🗎
+        The party has
+        • id 0,...,N-1
+        • private key x<sub>i</sub>
+        • public key X<sub>i</sub>
+    ]
+    init_swap_session_note("
+        🗎
+        • The party has received the swap description: the transfer cycle, the complete ordered
+        party list, the leader’s identity, and the proposed refund window heights W<sub>0</sub>,...,W<sub>N−1</sub> .
+        • The proposed windows satisfy the staggered invariant W<sub>0</sub> > W<sub>1</sub> > ··· > W<sub>N−1</sub>
+        with gaps W<sub>i</sub> − W<sub>i+1</sub> ≥ ∆.
+        • session id <code>SwapSession.id</code>
+        • party list &#91P<sub>0</sub>,...,P<sub>N-1</sub>&#93 <code>SwapSesssion.participants</code>
+        • Bitcoin blockchain start <code>SwapSession.start_block</code>
+        • Cardano blockchain start <code>SwapSession.start_slot</code>
+        • refund windows height &#91W<sub>0</sub>,...,W<sub>N-1</sub>&#93 <code>SwapSession.refund_window_secs</code>
+    ")
+    init_swap_session["
+        <b>Part 1 - Swap Description</b>
+        <i>configure swap session</i>
+        -
+        <code>types::SwapSession::new(...)</code>
+    "]
+    check_swap_session("
+        <b>Part 2 - Per-transfer consent</b>
+        <i>validate swap session</i>
+        -
+        <code>session::SwapSession::new(...) { check_cyclic(...)</code>
+    ")
+    set_adaptor_secret_and_points["
+        <i>set</i> t<sub>i</sub>, T<sub>i</sub>
+        -
+        <code>session::SwapSession::new(...)</code>
+    "]
+    swap_state_initialized("
+        ⤞ <u>SwapState::Initialized</u>
+    ")
+    run_daemon["
+        <i>run daemon</i>
+        -
+        <code>daemon.insert_session(session: SwapSession)</code>
+        <code>daemon.run()</code>
+    "]
+    setup_adaptor_point_exchange([
+        <b>Setup - Adaptor Point Exchange</b>
+    ])
+    failure([
+        <b>End - Failure</b>
+    ])
+    
+    start --> init_daemon
+    init_daemon_note --- init_daemon
+    init_swap_session_note --- init_swap_session
+    subgraph All - Config
+        init_daemon --> init_swap_session
+        init_swap_session --> check_swap_session
+        check_swap_session -- valid --> set_adaptor_secret_and_points
+        set_adaptor_secret_and_points --> swap_state_initialized
+        swap_state_initialized --> run_daemon
+    end
+    run_daemon --> setup_adaptor_point_exchange
+    check_swap_session -- invalid --> failure
+    
+%%  Setup - Adaptor Point Exchange
+    setup_adaptor_point_exchange([
+        <b>Setup - Adaptor Point Exchange</b>
+    ])
+    validate_utxo["
+        <i>validate UTxO</i>
+        -
+        <code>daemon.start_swap_session(session_id: u64) { </code>
+        <code>protocol::chain_monitor::validate_funding_utxos(...)</code>
+    "]
+    broadcast_adaptor_point["
+        <i>broadcast</i> T<sub>i</sub>
+        -
+        <code>protocol::adaptor_nonce::broadcast_adaptor_point(...)</code>
+    "]
+    swap_state_awaiting_adaptor_points("
+        ⤞ <u>SwapState::AwaitingAdaptorPoints</u>
+    ")
+    wire_message_adaptor_point("
+        ✉ WireMessage::AdaptorPoint(my_point)
+    ")
+    
+    receive_all_adaptor_points["
+        <i>receive all</i> T<sub>j</sub>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::AdaptorPoint { </code>
+        <code>utils.all_adaptor_points_received(...) { </code> ⇒ true
+    "]
+    swap_state_awaiting_leader_election_commitments("
+        ⤞ <u>SwapState::AwaitingLeaderElectionCommitments</u>
+    ")
+    failure([
+        <b>End - Failure</b>
+    ])  
+    setup_leader_election([
+        <b>Setup - Leader Election</b>
+    ])
+    
+    setup_adaptor_point_exchange --> validate_utxo
+    subgraph All - Broadcast
+        validate_utxo -- valid UTxO --> broadcast_adaptor_point
+        broadcast_adaptor_point --> swap_state_awaiting_adaptor_points
+    end
+    validate_utxo -- invalid UtxO --> failure
+    broadcast_adaptor_point -.-> wire_message_adaptor_point
+    
+    swap_state_awaiting_adaptor_points --> receive_all_adaptor_points
+    wire_message_adaptor_point -.-> receive_all_adaptor_points
+    subgraph All - Receive
+        receive_all_adaptor_points --> swap_state_awaiting_leader_election_commitments
+    end
+    swap_state_awaiting_leader_election_commitments --> setup_leader_election    
+
+%%  Leader Election
+    setup_leader_election([
+        <b>Setup - Leader Election</b>
+    ])
+    start_leader_election_note("
+        🗎
+        nonce n<sub>i</sub>
+        commitment c<sub>i</sub>
+    ")
+    %%  All - Commit Phase    
+    start_leader_election["
+        <i>set</i> n<sub>i</sub>, c<sub>i</sub>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::AdaptorPoint { </code>
+        <code>utils::all_adaptor_points_received(...) { </code> ⇒ true
+        <code>protocol::leader_election::start_leader_election(...)</code>
+    "]
+    broadcast_leader_election_commitment["
+        <i>broadcast</i> c<sub>i</sub>
+        -
+        <code>protocol::leader_election::start_leader_election(...)</code>
+    "]
+    wire_message_leader_election_commitment("
+        ✉ WireMessage::WireMessage::LeaderElectionCommitment
+    ")
+    receive_all_leader_election_commitment["
+        <i>receive all</i> c<sub>j</sub>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::LeaderElectionCommitment { </code>
+        <code>protocol::leader_election::received_leader_commitment(...) { </code>
+        <code>utils::all_leader_commitments_received(...) { ⇒ true </code>
+    "]
+    broadcast_leader_nonce["
+        <i>broadcast</i> n</i>
+        -
+        <code>leader_election::broadcast_leader_nonce(...)</code
+    "]
+    swap_state_awaiting_leader_election_nonce("
+        ⤞ <u>SwapState::AwaitingLeaderElectionNonces</u>
+    ")
+    wire_message_leader_election_nonce("
+        ⤞ <u>WireMessage::LeaderElectionNonce</u>
+    ")
+    
+    %%  All - Reveal Phase    
+    receive_all_leader_election_nonce["
+        <i>receive all</i> n<sub>j</sub>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::LeaderElectionNonce { </code>
+        <code>protocol::leader_election::received_leader_nonce(...)</code>
+        <code>utils::all_leader_nonces_received(...) { ⇒ true</code>
+    "]
+    compute_leader["
+        <i>compute leader</i>
+        
+        input = n₀ ‖ n₁ ‖ … ‖ n<sub>N−1</sub>
+        seed = SHA256(input)
+        v = u64::from_be_bytes(seed[0..8])
+        leader_index = v mod N
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::LeaderElectionNonce { </code>
+        <code>utils::all_leader_nonces_received(...) { </code> ⇒ true
+        <code>protocol::leader_election::compute_leader(...)</code>
+    "]
+    swap_state_refund_and_spend_txs_signing("
+        ⤞ </u>SwapState::RefundAndSpendTxsSigning</u>
+    ")
+    setup_musig2_rounds(["
+        <b>Setup - MuSig2 Rounds</b>
+    "])
+    
+    
+    setup_leader_election --> start_leader_election
+    start_leader_election_note --- start_leader_election
+    subgraph All - Commit Phase
+        start_leader_election --> broadcast_leader_election_commitment
+        broadcast_leader_election_commitment -.-> wire_message_leader_election_commitment
+        wire_message_leader_election_commitment -.-> receive_all_leader_election_commitment
+        receive_all_leader_election_commitment -- all commitment<sub>j</sub> received --> broadcast_leader_nonce
+        receive_all_leader_election_commitment -- if c<sub>j</sub> preceeds c<sub>i</sub> broadcast --> broadcast_leader_election_commitment
+        broadcast_leader_nonce --> swap_state_awaiting_leader_election_nonce
+    end
+    broadcast_leader_nonce -.-> wire_message_leader_election_nonce
+    swap_state_awaiting_leader_election_nonce --> receive_all_leader_election_nonce
+    wire_message_leader_election_nonce -.-> receive_all_leader_election_nonce
+    subgraph All - Revel Phase
+        receive_all_leader_election_nonce
+    end
+    receive_all_leader_election_nonce --> compute_leader
+    
+    subgraph All - Leader Computation
+        compute_leader --> swap_state_refund_and_spend_txs_signing
+    end
+    swap_state_refund_and_spend_txs_signing --> setup_musig2_rounds
+    
+%%  MuSig2 Rounds
+%%  All - Build Lock Transaction  
+    setup_musig2_rounds(["
+        <b>Setup - MuSig2 Rounds</b>
+    "])
+    build_lock_txs["
+        <i>build</i> lock<sup>tx</sup>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>handle_session_message(...) {{ WireMessage::LeaderElectionNonce { </code>
+        <code>utils::all_leader_nonces_received(...) { </code> ⇒ true
+        <code>protocol::lock_funds::build_lock_txs(...) { </code>
+    "]
+    
+    %%  All - MuSig2 Round 1
+    begin_refund_signing["
+        <i>build and sign</i> refund<sup>tx</sup>
+        -
+        <code>protocol::refund::begin_refund_signing::begin_refund_signing(...)</code>
+    "]
+    musig_round_one_refund("
+        🔒 MusigRuntime::RoundOne(TxRole::Refund, R<sub>i</sub>)
+    ")
+    broadcast_refund_schnorr["
+        <i>broadcast</i> refund<sup>tx</sup> R<sub>i</sub>
+        -
+        <code>protocol::refund::begin_refund_signing(...)</code>
+    "]
+    wire_message_schnorr_nonce_refund("
+        ✉ WireMessage::SchnorrNonce(TxRole::Refund, R<sub>i</sub>)
+    ")
+    begin_spend_signing["
+        <i>build and sign</i> spend<sup>tx</sup>
+        -
+        <code>protocol::spend::begin_spend_signing(...)</code>
+    "]
+    musig_round_one_spend("
+        🔒 MusigRuntime::RoundOne(TxRole::Spend, R<sub>i</sub>)
+    ")
+    broadcast_spend_schnorr["
+        <i>broadcast</i> spend<sup>tx</sup> R<sub>i</sub>
+        -
+        <code>protocol::spend::begin_spend_signing(...)</code>
+    "]
+    wire_message_schnorr_nonce_spend("
+        ✉ WireMessage::SchnorrNonce(TxRole::Spend, R<sub>i</sub>)
+    ")
+    
+    %%  All - MuSig2 Round 2
+    all_schnorr_nonces_received_for_refund["
+        <i>receive all</i> R<sub>j</sub> refund<sup>tx</sup>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::SchnorrNonce { </code>
+        <code>all_schnorr_nonces_received_for(role = TxRole::Refund)</code>
+    "]
+    all_schnorr_nonces_received_for_spend["
+        <i>receive all</i> R<sub>j</sub> spend<sup>tx</sup>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::SchnorrNonce { </code>
+        <code>all_schnorr_nonces_received_for(role = TxRole::Spend)</code>
+    "]
+    musig_round_two_refund("
+        🔒 MusigRuntime::RoundTwo(TxRole::Refund, R<sub>agg</sub>)
+    ")
+    musig_round_two_spend("
+        🔒 MusigRuntime::RoundTwo(TxRole::Spend, R<sub>agg</sub>)
+    ")
+    broadcast_aggregated_schnorr_nonce_refund["
+        <i>compute/i> R<sub>agg</sub> for refund<sup>tx</sup>
+        <i>broadcast/i> s<sub>i</sub> for refund<sup>tx</sup>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::SchnorrNonce { </code>
+        <code>transition_to_round_two(..., role = TxRole::Refund)</code>
+    "]
+    broadcast_aggregated_schnorr_nonce_spend["
+        <i>compute/i> R<sub>agg</sub> for spend<sup>tx</sup>
+        <i>broadcast/i> s<sub>i</sub> for refund<sup>tx</sup>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::SchnorrNonce { </code>
+        <code>transition_to_round_two(.... role = TxRole::Spend) </code>
+    "]
+    wire_message_partial_siganture_refund("
+        ✉ WireMessage::PartialSignature(TxRole::Refund, s)
+    ")
+    wire_message_partial_siganture_spend("
+        ✉ WireMessage::PartialSignature(TxRole::Refund, s)
+    ")
+    
+    %%  All - MuSig2 Pre-Signature
+    receive_all_partial_signature_refund["
+        <i>receive all</i> s<sub>j</sub> for refund<sup>tx</sup>
+        <i>pre-sign</i> s'<sub>i</sub> for refund<sup>tx</sup>
+        -
+        <code>daemon.run() { loop {{ </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::PartialSignature { </code>
+        <code>all_partial_sigs_received_for(role = TxRole::Refund)</code>
+    "]
+    receive_all_partial_signature_spend["
+        <i>receive all</i> s<sub>j</sub> for spend<sup>tx</sup>
+        <i>pre-sign</i> s'<sub>i</sub> for spend<sup>tx</sup>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::PartialSignature { </code>
+        <code>all_partial_sigs_received_for(role = TxRole::Spend)</code>
+    "]
+    swap_state_funding("
+        ⤞ <u>SwapState::Funding</u>
+        -
+        <code>all_partial_sigs_received_for_all_refund_and_spend_txs(...) { ⇒ true </code>
+    ")
+    lock(["
+    <b>Lock</b>
+    "])
+    
+    
+    setup_musig2_rounds --> build_lock_txs
+    subgraph All - Build Lock Transaction
+        build_lock_txs
+    end
+    build_lock_txs --> begin_refund_signing
+    build_lock_txs --> begin_spend_signing
+    subgraph All - MuSig2 Round 1: Schnorr Nonce Exchange
+        begin_refund_signing --> musig_round_one_refund
+        musig_round_one_refund --> broadcast_refund_schnorr
+        begin_spend_signing --> musig_round_one_spend
+        musig_round_one_spend --> broadcast_spend_schnorr
+    end
+    broadcast_refund_schnorr -.-> wire_message_schnorr_nonce_refund
+    broadcast_spend_schnorr -.-> wire_message_schnorr_nonce_spend
+    
+    wire_message_schnorr_nonce_refund -.-> all_schnorr_nonces_received_for_refund
+    wire_message_schnorr_nonce_spend -.-> all_schnorr_nonces_received_for_spend
+    subgraph All - MuSig2 Round 2 - Partial Pre-Signature Exchange
+        all_schnorr_nonces_received_for_refund --> musig_round_two_refund
+        all_schnorr_nonces_received_for_spend --> musig_round_two_spend
+        musig_round_two_refund --> broadcast_aggregated_schnorr_nonce_refund
+        musig_round_two_spend --> broadcast_aggregated_schnorr_nonce_spend
+    end
+    broadcast_aggregated_schnorr_nonce_refund -.-> wire_message_partial_siganture_refund
+    broadcast_aggregated_schnorr_nonce_spend -.-> wire_message_partial_siganture_spend
+    
+    wire_message_partial_siganture_refund -.-> receive_all_partial_signature_refund
+    wire_message_partial_siganture_spend -.-> receive_all_partial_signature_spend
+    subgraph All - MuSig2 Pre-Signature
+        receive_all_partial_signature_refund --> swap_state_funding
+        receive_all_partial_signature_spend --> swap_state_funding
+    end
+    swap_state_funding --> lock
+    
+%%  Lock
+    lock(["
+        <b>Lock</b>
+    "])
+    %%  All - depositor
+    write_lock[("
+        <i>write</i> lock<sup>tx</sup><sub>i</sub>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::PartialSignature { </code>
+        <code>utils::all_partial_sigs_received_for_all_refund_and_spend_txs(...) { </code> ⇒ true
+        <code>protocol::lock_funds::broadcast_my_lock_tx(...)</code>
+    ")]
+    broadcast_lock["
+        <i>broadcast</i> lock<sup>tx</sup><sub>i</sub>
+        -
+        <code>protocol::lock_funds::broadcast_my_lock_tx(...)</code>
+    "]
+    swap_state_awaiting_lock_confirmations(["
+        ⤞ <u>SwapState::AwaitingLockConfirmations</u>
+        -
+        <code>protocol::lock_funds::broadcast_my_lock_tx(...) { </code> ⇒ true
+    "])
+    swap_state_failed("
+        ⤞ <u>SwapState::Failed</u>
+        -
+        <code>protocol::lock_funds::broadcast_my_lock_tx(...) { </code> ⇒ false
+    ")
+    failure([
+        <b>End - Failure</b>
+    ])
+    
+    wire_message_lock_transaction_broadcast[
+        ✉  WireMessage::LockTxBroadcast
+    ]
+    
+    %%  All - withdrawer    
+    receive_lock["
+        <i>receive</i> lock<sup>tx</sup><sub>j</sub>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::LockTxBroadcast { </code>
+    "]
+    receive_lock_note("
+        🗎
+        The daemon spaws a chain poller for this party to monitor lock<sup>tx</sup> are on chain.
+    ")
+    read_lock[("
+        ↻ <i>read<i/> lock<sup>tx</sup><sub>j</sub>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.hande_event(...) {{ DaemonEvent::ChainPoll {{ ChainPollTarget::LockTx { </code>
+        <code>protocol::chain_monitor::check_lock_tx_confirmed(...)</code>
+    ")]
+    read_all_lock("
+        <i>confirm all</i> lock<sup>tx</sup><sub>j</sub>
+        -
+        <code>utils::all_lock_txs_confirmed(...) == true { </code> ⇒ true
+    ")
+    claim(["
+        <b>Claim</b>
+    "])
+    refund(["
+        <b>Refund</b>
+    "])
+    
+    
+    lock -- in parallel --> write_lock
+    lock -- in parallel --> read_lock
+    subgraph "All - depositor P<sub>i</sub> of lock<sup>tx</sup><sub>i</sub>"
+        write_lock -- success --> broadcast_lock
+        broadcast_lock --> swap_state_awaiting_lock_confirmations
+    end
+    write_lock -- failure --> swap_state_failed
+    swap_state_failed --> failure
+    broadcast_lock -.-> wire_message_lock_transaction_broadcast
+    
+    wire_message_lock_transaction_broadcast -.-> receive_lock
+    subgraph "All - withdrawer P<sub>i+1 mod N</sub>"
+        swap_state_awaiting_lock_confirmations --> receive_lock
+        receive_lock -.- receive_lock_note
+        receive_lock_note -.- read_lock
+        read_lock -- check --> read_all_lock
+        read_all_lock -- all not confirmed yet --> read_lock
+    end
+    read_all_lock -- all confirmed --> claim
+    read_all_lock -- refund window timeout trigger --> refund
+    
+%%  Claim - Secret Reveal   
+    claim(["
+        <b>Claim</b>
+    "])
+    
+    %%  Leader    
+    swap_state_awaiting_secrets("
+        ⤞ <u>SwapState::AwaitingSecrets</u>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code> daemon.handle_event(...) {{ DaemonEvent::ChainPoll {{{ ChainPollTarget::LockTx { </code>
+        <code>utils::all_lock_txs_confirmed(session) { </code> ⇒ true
+        <code>session.leader == Some(my_id)</code> ⇒ true
+    ")
+    receive_all_secrets["
+        <i>receive all</i> t<sub>j</sub>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::SecretReveal { </code>
+        <code>utils::all_adaptor_secrets_received() { </code> ⇒ true
+    "]
+    swap_state_claiming_leader("
+        ⤞ <u>SwapState::Claiming</u>
+        -
+        <code>my_id == leader_id { </code> ⇒ true
+    ")
+    
+    wire_message_secret_reveal("
+        ✉ WireMessage::SecretReveal
+    ")
+    
+    %%  All Not Leader
+    cast_secret["
+        <i>cast to P<sub>leader</sub></i> s<sub>i</sub>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::CastSecret { </code>
+        <code>my_id != leader_id { </code> ⇒ true
+    "]
+    swap_state_awaiting_leader_spend("
+        ⤞ <u>SwapState::AwaitingLeaderSpend</u>
+    ")
+    refund(["
+        <b>Refund</b>
+    "])
+    
+    claim -- P<sub>i ≠ leader</sub> --> cast_secret
+    claim -- P<sub>leader</sub> --> swap_state_awaiting_secrets
+    subgraph All - Not Leader
+        cast_secret --> swap_state_awaiting_leader_spend
+    end
+    cast_secret -.-> wire_message_secret_reveal
+    wire_message_secret_reveal -.-> receive_all_secrets
+    subgraph Leader Only
+        swap_state_awaiting_secrets --> receive_all_secrets
+        receive_all_secrets --> swap_state_claiming_leader
+    end
+%%    swap_state_claiming_leader --> claim_spend
+%%    swap_state_awaiting_leader_spend --> claim_spend
+    swap_state_claiming_not_leader -- refund windows timeout trigger --> refund
+    swap_state_awaiting_leader_spend -- refund windows timeout trigger --> refund
+
+%%  Claim - Spend 
+    %%  Leader Only
+    write_spend_tx_leader[("
+        <i>sign and write</i> spend<sup>tx</sup><sub>leader</sub>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::SecretReveal { </code>
+        <code>all_adaptor_secrets_received(...) { </code> ⇒ true
+        <code>my_id == leader_id{ </code> ⇒ true
+        <code>protocol:spend::broadcast_my_spend_tx(...)</code>
+    ")]
+    broadcast_spend_tx_leader["
+        <i>broadcast</i> spend<sup>tx</sup><sub>leader</sub>
+        -
+        <code>protocol:spend::broadcast_my_spend_tx(...)</code>
+    "]
+    wire_message_spend_tx_broadcast_leader("
+        ✉ WireMessage::SpendTxBroadcast
+    ")
+    swap_state_completed_leader(["
+        ⤞ <u>SwapState::Completed</u>
+    "])
+    refund([
+        <b>Refund</b>
+    ])
+    success_leader(["
+        <b>End - Success</b>
+    "])
+    
+    
+
+%%  All Not Leader
+    receive_spend_tx_leader["
+        <i>receive</i> spend<sup>tx</sup><sub>leader</sub>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ match WireMessage::SpendTxBroadcast { </code>
+    "]
+    receive_spend_tx_leader_note("
+        🗎
+        The daemon spaws a chain poller for this party to monitor lock<sup>tx</sup> are on chain.
+    ")
+    read_spend_tx_leader[("
+        ↻ <i>read<i/> spend<sup>tx</sup><sub>leader</sub>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::ChainPoll {{{ ChainPollTarget::LeaderSpendTx { </code>
+        <code>protocol::chain_monitor::check_leader_spend_confirmed(...)</code>
+    ")]
+    read_leader_spend_tx_confirmed["
+        <i>confirm<i/> spend<sup>tx</sup><sub>leader</sub>
+        -
+        <code>protocol::chain_monitor::check_leader_spend_confirmed(...) { </code> ⇒ true
+    "]
+    write_spend_tx[("
+        <i>sign and write<i/> spend<sup>tx</sup><sub>i</sub>
+        -
+        <code>protocol::secret::extract_secret_and_adapt(...) { ⇒ true</code>
+        <code>broadcast_my_spend_tx(...)</code>
+    ")]
+    swap_state_claiming_not_leader(["
+        ⤞ <u>SwapState::Claiming</u>
+        -
+        <code>protocol::secret::extract_secret_and_adapt(...) { </code> ⇒ true
+    "])
+    broadcast_spend_tx["
+        <i>broadcast<i/> spend<sup>tx</sup><sub>i</sub>
+        -
+        <code>protocol::spend::broadcast_my_spend_tx(...)</code>
+    "]
+    swap_state_completed(["
+        ⤞ <u>SwapState::Completed</u>
+    "])
+    refund([
+        <b>Refund</b>
+    ])
+
+    %%  All
+    receive_spend_tx["
+        <i>receive</i> spend<sup>tx</sup><sub>j</sub>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::PeerMessage { </code>
+        <code>session.handle_session_message(...) {{ WireMessage::SpendTxBroadcast { </code>
+    "]
+    receive_spend_tx_note("
+        🗎
+        Log
+    ")
+    
+    
+    wire_message_spend_tx_broadcast("
+        ✉ WireMessage::SpendTxBroadcast
+    ")
+
+    swap_state_claiming_leader -- P<sub>leader</sub> --> write_spend_tx_leader
+    swap_state_awaiting_leader_spend -- P<sub>i ≠ leader</sub> --> receive_spend_tx_leader
+    wire_message_spend_tx_broadcast_leader -.-> receive_spend_tx_leader
+    subgraph Leader Only
+        write_spend_tx_leader
+        write_spend_tx_leader --> broadcast_spend_tx_leader
+        broadcast_spend_tx_leader --> swap_state_completed_leader
+    end
+    subgraph All - Not Leader
+        receive_spend_tx_leader -.- receive_spend_tx_leader_note
+        receive_spend_tx_leader_note -.- read_spend_tx_leader
+        read_leader_spend_tx_confirmed -- not yet confirmed --> read_spend_tx_leader
+        read_spend_tx_leader -- check --> read_leader_spend_tx_confirmed
+        read_leader_spend_tx_confirmed -- success --> swap_state_claiming_not_leader
+        swap_state_claiming_not_leader -- success --> write_spend_tx
+        broadcast_spend_tx --> swap_state_completed
+        write_spend_tx --> broadcast_spend_tx
+    end
+    broadcast_spend_tx_leader -.-> wire_message_spend_tx_broadcast
+    broadcast_spend_tx -.-> wire_message_spend_tx_broadcast
+    wire_message_spend_tx_broadcast -.-> receive_spend_tx
+    subgraph All - Log
+        receive_spend_tx -.- receive_spend_tx_note
+    end
+    broadcast_spend_tx_leader -.-> wire_message_spend_tx_broadcast_leader
+    swap_state_completed_leader --> success_leader
+    success_leader -- interrupt --> refund
+    
+%%  Refund
+    read_block_height[("
+        ↻ <i>read block height</i>
+        -
+        <code>daemon.run(...) { loop {{ event_rx.recv().await { </code>
+        <code>daemon.handle_event(...) {{ DaemonEvent::ChainPoll {{{ ChainPollTarget::RefundWindow { </code>
+    ")]
+    refund_window_open["
+        <i>block height ≥ W<sub>i</sub>?</i>
+        -
+        <code>protocol::chain_monitor::check_refund_window_open(...)</code>
+    "]
+    write_refund_tx[("
+        <i>sign and write</i> refund<sup>tx</sup>
+        -
+        <code>protocol::refund::broadcast_my_refund_tx(...)</code>
+    ")]
+    swap_state_refunded("
+        ⤞ <u>SwapState::Refunded</u>
+    ")
+    success(["
+        <b>End - Success</b>
+    "])
+
+    refund --> read_block_height
+    subgraph All - Refund
+        refund_window_open -- block height < W<sub>i</sub> ⇒ false --> read_block_height
+        read_block_height -- check --> refund_window_open
+        refund_window_open -- block height ≥ W<sub>i</sub> ⇒ true --> write_refund_tx
+        write_refund_tx -- success --> swap_state_refunded
+    end
+    write_refund_tx -- failure --> swap_state_failed
+    swap_state_refunded --> success
+    success -- interrupt --> claim
+    
+```
