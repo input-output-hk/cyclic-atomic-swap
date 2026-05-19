@@ -1,5 +1,5 @@
-# cyclic-atomic-swap
-Cyclic Atomic N-Parities Swap Protocol
+# Cyclic Atomic N-party Swap Protocol
+## Trustless Cross-chain Swaps via Adaptor Signatures
 
 ## License
 
@@ -14,5 +14,18 @@ Unless required by applicable law or agreed to in writing, software distributed 
 See the License for the specific language governing permissions and limitations under the License.
 
 ## Intro
+
+This repository provides a **Rust** reference implementation for the [Cyclic Atomic N-party Swap (CANS) protocol](),
+a trustless cross-chain swap mechanism that enables secure and efficient atomic swaps among multiple parties 
+without the need for intermediaries. 
+It leverages adaptor signatures to facilitate secure and non-interactive swaps across different blockchain networks.
+
+- **Cyclic**: P1 → P2 → … → Pn → P1: each participant sends exactly once and receives exactly once.
+- **Atomic**: Either all spend txs complete, or all refunds fire. If any participant aborts, 
+  time-locked refunds guarantee  no participant loses funds N-party.
+- **N-party**: The proposed implementatuib scales to N participants.
+- **Swap**: The implementation supports same-chain or cross-chain legs (ADA ↔ ADA, BTC ↔ ADA, BTC ↔ ADA, BTC ↔ BTC).
+- Participants need only trust the cryptographic protocol — not each other
+
 
 ## Getting Started
