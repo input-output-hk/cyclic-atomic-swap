@@ -1,0 +1,95 @@
+{
+  "preamble": {
+    "title": "me/swap_validator",
+    "description": "Aiken contracts for project 'me/swap_validator'",
+    "version": "0.0.0",
+    "plutusVersion": "v3",
+    "compiler": {
+      "name": "Aiken",
+      "version": "v1.1.21+42babe5"
+    },
+    "license": "Apache-2.0"
+  },
+  "validators": [
+    {
+      "title": "swap.swap.spend",
+      "datum": {
+        "title": "datum",
+        "schema": {
+          "$ref": "#/definitions/swap~1SwapDatum"
+        }
+      },
+      "redeemer": {
+        "title": "redeemer",
+        "schema": {
+          "$ref": "#/definitions/swap~1SwapRedeemer"
+        }
+      },
+      "compiledCode": "59016601010029800aba2aba1aab9faab9eaab9dab9a48888896600264653001300700198039804000cdc3a400530070024888966002600460106ea800e2653001300c00198061806800cdc3a400091119912cc004c00c00626464b300130140028024590121bae3012001300f37540151598009804000c4c8c96600260280050048b2024375c6024002601e6ea802a2c806900d0acc004c004c030dd500144c9660026004601a6ea802633001375c6020601c6ea80066eb8c040c038dd50024dd7180818071baa0095daa264b30013008300e375400315980099b89375a60226024601e6ea8008dd6980898079baa0018cc004dd7180898079baa0029b943371690011bae3011300f375400b375c6022601e6ea802976a8b201a8b201a3010300e37546020601c6ea8c040c044c044c044c044c044c044c044c038dd50032018300f300d375400516402c60186ea802060126ea800e2c8038600e00260066ea801e29344d95900101",
+      "hash": "afdc922d468f249b3bd5b3504a8f42bec5ac26a8f61a0e92543603e8"
+    },
+    {
+      "title": "swap.swap.else",
+      "redeemer": {
+        "schema": {}
+      },
+      "compiledCode": "59016601010029800aba2aba1aab9faab9eaab9dab9a48888896600264653001300700198039804000cdc3a400530070024888966002600460106ea800e2653001300c00198061806800cdc3a400091119912cc004c00c00626464b300130140028024590121bae3012001300f37540151598009804000c4c8c96600260280050048b2024375c6024002601e6ea802a2c806900d0acc004c004c030dd500144c9660026004601a6ea802633001375c6020601c6ea80066eb8c040c038dd50024dd7180818071baa0095daa264b30013008300e375400315980099b89375a60226024601e6ea8008dd6980898079baa0018cc004dd7180898079baa0029b943371690011bae3011300f375400b375c6022601e6ea802976a8b201a8b201a3010300e37546020601c6ea8c040c044c044c044c044c044c044c044c038dd50032018300f300d375400516402c60186ea802060126ea800e2c8038600e00260066ea801e29344d95900101",
+      "hash": "afdc922d468f249b3bd5b3504a8f42bec5ac26a8f61a0e92543603e8"
+    }
+  ],
+  "definitions": {
+    "ByteArray": {
+      "dataType": "bytes"
+    },
+    "Int": {
+      "dataType": "integer"
+    },
+    "swap/SwapDatum": {
+      "title": "SwapDatum",
+      "anyOf": [
+        {
+          "title": "SwapDatum",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "aggregate_pubkey",
+              "$ref": "#/definitions/ByteArray"
+            },
+            {
+              "title": "refund_slot",
+              "$ref": "#/definitions/Int"
+            }
+          ]
+        }
+      ]
+    },
+    "swap/SwapRedeemer": {
+      "title": "SwapRedeemer",
+      "anyOf": [
+        {
+          "title": "Spend",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "signature",
+              "$ref": "#/definitions/ByteArray"
+            }
+          ]
+        },
+        {
+          "title": "Refund",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": [
+            {
+              "title": "signature",
+              "$ref": "#/definitions/ByteArray"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

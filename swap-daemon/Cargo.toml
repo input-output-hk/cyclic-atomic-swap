@@ -1,0 +1,54 @@
+[package]
+name = "swap-daemon"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = { version = "0.8", optional = true }
+bitcoin = { version="0.32.8", features=["rand"]}
+blake2 = "0.10"
+blockfrost = "1.2.2"
+cardano-serialization-lib = "15.0.3"
+ed25519-dalek = "2"
+hex = "0.4"
+musig2 =  "0.3.1"
+rand = "0.8"
+reqwest = { version = "0.12", features = ["rustls-tls"] }
+secp256k1 = { version = "0.31.1", features = ["rand", "hashes"]  }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+utxorpc = "0.13"
+
+[features]
+regtest = []
+dashboard = ["dep:axum"]
+
+[[test]]
+name = "completed_regression_test"
+path = "tests/regtest/completed_regression_test.rs"
+
+[[test]]
+name = "20_party_completed_regression_test"
+path = "tests/regtest/20_party_completed_regression_test.rs"
+
+[[test]]
+name = "refunded_regression_test"
+path = "tests/regtest/refunded_regression_test.rs"
+
+[[test]]
+name = "failed_regression_test"
+path = "tests/regtest/failed_regression_test.rs"
+
+[[test]]
+name = "early_refund_rejection_regression_test"
+path = "tests/regtest/early_refund_rejection_regression_test.rs"
+
+[[test]]
+name = "preprod_integration_test"
+path = "tests/preprod/preprod_integration_test.rs"
+
+[dev-dependencies]
+wiremock = "0.5"

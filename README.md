@@ -1,4 +1,5 @@
 # Cyclic Atomic N-party Swap Protocol
+
 ## Trustless Cross-chain Swaps via Adaptor Signatures
 
 ## License
@@ -9,23 +10,28 @@ Licensed under the [Apache License, Version 2.0](LICENSE) (the "License").
 You may not use this repository except in compliance with the License.
 You may obtain a copy of the License at [link] http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an 
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and limitations under the License.
 
 ## Intro
 
 This repository provides a **Rust** reference implementation for the [Cyclic Atomic N-party Swap (CANS) protocol](),
-a trustless cross-chain swap mechanism that enables secure and efficient atomic swaps among multiple parties 
-without the need for intermediaries. 
+a trustless cross-chain swap mechanism that enables secure and efficient atomic swaps among multiple parties
+without the need for intermediaries.
 It leverages adaptor signatures to facilitate secure and non-interactive swaps across different blockchain networks.
 
 - **Cyclic**: P1 → P2 → … → Pn → P1: each participant sends exactly once and receives exactly once.
-- **Atomic**: Either all spend txs complete, or all refunds fire. If any participant aborts, 
-  time-locked refunds guarantee  no participant loses funds N-party.
+- **Atomic**: Either all spend txs complete, or all refunds fire. If any participant aborts,
+  time-locked refunds guarantee no participant loses funds N-party.
 - **N-party**: The proposed implementatuib scales to N participants.
 - **Swap**: The implementation supports same-chain or cross-chain legs (ADA ↔ ADA, BTC ↔ ADA, BTC ↔ ADA, BTC ↔ BTC).
 - Participants need only trust the cryptographic protocol — not each other
 
-
 ## Getting Started
+
+1. Presentation
+2. [Protocol Specification](docs/protocol_specification.pdf)
+3. Software Architecture
+4. [Reference Implemntation](swap-daemon/README.md)
+5. [Formal Methods](formal-methods/README.md) 
