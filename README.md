@@ -14,6 +14,14 @@ Unless required by applicable law or agreed to in writing, software distributed 
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and limitations under the License.
 
+#### Contributors
+
+- Architecture [Luca Debiasi](luca.debiasi@iohk.io)
+- Code Development [Edmund Judge](edmund.judge@iohk.io)
+- Formal Methods [Mauro Jaskelioff](mauro.jaskelioff@iohk.io)
+- Scientific Research [Lukas Aumayr](lukas.aumayr@iohk.io)
+
+
 ## Intro
 
 This repository provides a **Rust** reference implementation for the [Cyclic Atomic N-party Swap (CANS) protocol](),
