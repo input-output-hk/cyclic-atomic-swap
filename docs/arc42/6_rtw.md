@@ -3,6 +3,67 @@
 ## 6.1 Daemon
 
 [`types::Daemon`](../../swap-daemon/src/daemon.rs)
+
+```mermaid
+flowchart TD
+%% ============================================================
+%% Lifecycle / bootstrap
+%% ============================================================
+    new["Daemon::new(swap_keys, config)"]
+    insert_session["daemon.insert_session(session)"]
+    start_swap_session["daemon.start_swap_session(session_id)"]
+    run["daemon.run()"]
+
+    new --> insert_session --> start_swap_session --> run
+
+    %% Two concurrent tokio tasks spawned by run()
+    run -- "tokio::spawn (accept loop)" --> NET
+    run -- "tokio::spawn (event loop)" --> EVENT
+
+    %% ============================================================
+    %% Networking subgraph: TCP accept + connection handling
+    %% ============================================================
+    subgraph NET["Networking task"]
+      listener_accept --> listener_accept
+      listener_accept -- "tokio::spawn" --> handle_connection
+      
+      listener_accept["listener.accept()"]
+      handle_connection["networking::handle_connection(...)"]
+    end
+
+    handle_connection -.-> DaemonEvent::PeerMessage 
+    DaemonEvent::PeerMessage("✉ DaemonEvent::PeerMessage")
+
+    event_rx_recv --> handle_event
+    DaemonEvent::PeerMessage -.-> event_rx_recv
+%%    handle_event -.-> listener_accept
+    
+    subgraph EVENT["Event handling task"]
+      event_rx_recv["event_rx_recv()"]
+      handle_event["daemon.handle_event(event, event_tx)"]
+      match_event{?}
+
+      handle_event --> match_event 
+      match_event -- ✉ DaemonEvent::PeerMessage --> MESSAGE
+      match_event -- ↻ DaemonEvent::ChainPoll --> CHAIN_POLL
+      
+      subgraph MESSAGE["Message handling"]
+        handle_session_message --> match_target
+        match_target --> ChainPollTarget::LockTx
+        match_target --> ChainPollTarget::LeaderSpendTx
+        match_target --> ChainPollTarget::RefundWindow
+
+        handle_session_message["session.handle_session_message(wire_message, partecipant_id, keys, config)"]
+        match_target{?}
+      end
+      
+      subgraph CHAIN_POLL["Chain polling"]
+      end
+    end
+
+%%  handle_session_message -.-  DaemonEvent::PeerMessage 
+
+```
  
 ---
 
