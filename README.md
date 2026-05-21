@@ -2,18 +2,6 @@
 
 ## Trustless Cross-chain Swaps via Adaptor Signatures
 
-## License
-
-Copyright 2025 Input Output Global
-
-Licensed under the [Apache License, Version 2.0](LICENSE) (the "License").
-You may not use this repository except in compliance with the License.
-You may obtain a copy of the License at [link] http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and limitations under the License.
-
 ## Intro
 
 This repository provides a **Rust** reference implementation for the [Cyclic Atomic N-party Swap (CANS) protocol](),
@@ -35,3 +23,26 @@ It leverages adaptor signatures to facilitate secure and non-interactive swaps a
 3. [Software Architecture](docs/arc42/toc.md)
 4. [Reference Implemntation](swap-daemon/README.md)
 5. [Formal Methods](formal-methods/README.md) 
+
+---
+
+## License
+
+Copyright 2025 Input Output Global
+
+Licensed under the [Apache License, Version 2.0](LICENSE) (the "License").
+You may not use this repository except in compliance with the License.
+You may obtain a copy of the License at [link] http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and limitations under the License.
+
+#### Contributors
+
+- Architecture: [Luca Debiasi](luca.debiasi@iohk.io), [Andrew Sutherland](andrew.sutherland@iohk.io)
+- Code Development: [Edmund Judge](edmund.judge@iohk.io)
+- Formal Methods: Lucas Escot, [Mauro Jaskelioff](mauro.jaskelioff@iohk.io)
+- Scientific Research: [Lukas Aumayr](lukas.aumayr@iohk.io)
+
+
