@@ -148,7 +148,7 @@ flowchart TD
         SwapState::AwaitingSecrets>"SwapState::AwaitingSecrets"]
         
         poll_match_target -- "ChainPollTarget::LeaderSpendTx" --> LeaderSpendTx --> check_leader_spend_confirmed --> extract_secret_and_adapt -- "P<sub>leader<</sub>'s spend<sup>tx</sup> on chain?" --> is_extract_secret_and_adapt
-        is_extract_secret_and_adapt -- true --> CHAIN_POLL_SwapState::Claiming --> CHAIN_POLL_broadcast_my_spend_tx --> CHAIN_POLL_SwapState::Completed
+        is_extract_secret_and_adapt -- true --> CHAIN_POLL_SwapState::Claiming --> CHAIN_POLL_broadcast_my_spend_tx --> CHAIN_POLL_SwapState::Completed -- interrupt --> cancel_session_pollers
         LeaderSpendTx("ChainPollTarget::LeaderSpendTx { leader_id } ")
         check_leader_spend_confirmed["protocol::chain_monitor::check_leader_spend_confirmed(session, leader_id, config) ⇒ true"]
         extract_secret_and_adapt[["extract_secret_and_adapt(session, leader_id, config)"]]
@@ -175,11 +175,17 @@ flowchart TD
         
       end
 
-      is_extract_secret_and_adapt -- false --> maybe_spawn_pollers
-      cancel_session_pollers -- interrupt --> maybe_spawn_pollers
+
+      SwapState::AwaitingSecrets --> maybe_spawn_pollers
+      CHAIN_POLL_SwapState::AwaitingLeaderSpend --> maybe_spawn_pollers
+      cancel_session_pollers -- interrupt --> spawn_pollers
       is_done -- true --> maybe_spawn_pollers
+      is_extract_secret_and_adapt -- false --> maybe_spawn_pollers
+      
       subgraph POLL
+        maybe_spawn_pollers --> spawn_pollers
         maybe_spawn_pollers[["daemon.maybe_spawn_pollers(session_id, event_tx)"]]
+        spawn_pollers
       end
     end
     
@@ -189,7 +195,7 @@ flowchart TD
     WireMessage::LeaderElectionNonce("✉ WireMessage::LeaderElectionNonce")
     MusigRuntime::RoundTwo -.-> WireMessage::PartialSignature --> x
     WireMessage::PartialSignature("✉ WireMessage::PartialSignature")
-    SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast --> x 
+    SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast --> x
     WireMessage::LockTxBroadcast("✉ WireMessage::LockTxBroadcast")
     MESSAGE_SwapState::Completed -.-> WireMessage::SpendTxBroadcast --> x
     WireMessage::SpendTxBroadcast("✉  WireMessage::SpendTxBroadcast)")
