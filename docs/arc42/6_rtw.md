@@ -138,17 +138,20 @@ flowchart TD
         peer_match_target -- ✉ WireMessage::SpendTxBroadcast --> SpendTxBroadcast --> note_for_SpendTxBroadcast
         SpendTxBroadcast["WireMessage::SpendTxBroadcast"]
         note_for_SpendTxBroadcast("🗎<br>Log")
+
+        start_leader_election -.-> WireMessage::LeaderElectionCommitment
+        SwapState::AwaitingLeaderElectionNonces -.-> WireMessage::LeaderElectionNonce
+        WireMessage::LeaderElectionCommitment("✉ WireMessage::LeaderElectionCommitment")
+        WireMessage::LeaderElectionNonce("✉ WireMessage::LeaderElectionNonce")
+        WireMessage::PartialSignature("✉ WireMessage::PartialSignature")
+        WireMessage::LockTxBroadcast("✉ WireMessage::LockTxBroadcast")
+        MESSAGE_SwapState::Completed -.-> WireMessage::SpendTxBroadcast 
+        
+        
       end
       
       subgraph CHAIN_POLL["Chain event handling"]
-        poll_match_target -- "ChainPollTarget::LockTx" --> LockTx  --> all_lock_txs_confirmed --> CHAIN_POLL_is_leader
-        CHAIN_POLL_is_leader -- "P<sub>leader</sub>" --> SwapState::AwaitingSecrets
-        CHAIN_POLL_is_leader{?} -- "P<sub>i≠leader</sub>" --> CHAIN_POLL_SwapState::AwaitingLeaderSpend
-        LockTx("ChainPollTarget::LockTx { partertecipant_id }")
-        all_lock_txs_confirmed["utils::all_lock_txs_confirmed(session) ⇒ true"]
-        CHAIN_POLL_SwapState::AwaitingLeaderSpend>"SwapState::AwaitingLeaderSpend"]
-        SwapState::AwaitingSecrets>"SwapState::AwaitingSecrets"]
-        
+                
         poll_match_target -- "ChainPollTarget::LeaderSpendTx" --> LeaderSpendTx --> check_leader_spend_confirmed --> extract_secret_and_adapt -- "P<sub>leader<</sub>'s spend<sup>tx</sup> on chain?" --> is_extract_secret_and_adapt
         is_extract_secret_and_adapt -- true --> CHAIN_POLL_SwapState::Claiming --> CHAIN_POLL_broadcast_my_spend_tx --> CHAIN_POLL_SwapState::Completed -- interrupt --> cancel_session_pollers
         LeaderSpendTx("ChainPollTarget::LeaderSpendTx { leader_id } ")
@@ -171,12 +174,22 @@ flowchart TD
         SwapState::Refunded>"SwapState::Refunded"]
         CHAIN_POLL_SwapState::Failed>"SwapState::Failed"]
         cancel_session_pollers["daemon.cancel_session_pollers(session_id)"]
-        
-        y[\./]
 
-        is_extract_secret_and_adapt -- false --> y
-        is_done -- true --> y
-        y --> maybe_spawn_pollers
+        poll_match_target -- "ChainPollTarget::LockTx" --> LockTx  --> all_lock_txs_confirmed --> CHAIN_POLL_is_leader
+        CHAIN_POLL_is_leader -- "P<sub>leader</sub>" --> SwapState::AwaitingSecrets
+        CHAIN_POLL_is_leader{?} -- "P<sub>i≠leader</sub>" --> CHAIN_POLL_SwapState::AwaitingLeaderSpend
+        LockTx("ChainPollTarget::LockTx { partertecipant_id }")
+        all_lock_txs_confirmed["utils::all_lock_txs_confirmed(session) ⇒ true"]
+        CHAIN_POLL_SwapState::AwaitingLeaderSpend>"SwapState::AwaitingLeaderSpend"]
+        SwapState::AwaitingSecrets>"SwapState::AwaitingSecrets"]
+        
+        join_to_maybe_spawn_pollers[\./]
+
+        WireMessage::SpendTxBroadcast("✉  WireMessage::SpendTxBroadcast)")
+        CHAIN_POLL_SwapState::AwaitingLeaderSpend -.-> WireMessage::SecretReveal
+        is_extract_secret_and_adapt -- false --> join_to_maybe_spawn_pollers
+        is_done -- true --> join_to_maybe_spawn_pollers
+        join_to_maybe_spawn_pollers --> maybe_spawn_pollers
         SwapState::AwaitingSecrets --> maybe_spawn_pollers
         CHAIN_POLL_SwapState::AwaitingLeaderSpend --> maybe_spawn_pollers
 
@@ -185,30 +198,22 @@ flowchart TD
         
       end
 
-
-
       cancel_session_pollers -- interrupt --> POLL
       maybe_spawn_pollers --> POLL
       subgraph POLL
         spawn_pollers
       end
-    end
-    
-    start_leader_election -.-> WireMessage::LeaderElectionCommitment --> x     
-    WireMessage::LeaderElectionCommitment("✉ WireMessage::LeaderElectionCommitment")
-    SwapState::AwaitingLeaderElectionNonces -.-> WireMessage::LeaderElectionNonce --> x
-    WireMessage::LeaderElectionNonce("✉ WireMessage::LeaderElectionNonce")
-    MusigRuntime::RoundOne -.-> WireMessage::SchnorrNonce --> x
-    MusigRuntime::RoundTwo -.-> WireMessage::PartialSignature --> x
-    WireMessage::PartialSignature("✉ WireMessage::PartialSignature")
-    SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast --> x
-    WireMessage::LockTxBroadcast("✉ WireMessage::LockTxBroadcast")
-    MESSAGE_SwapState::Completed -.-> WireMessage::SpendTxBroadcast --> x
-    WireMessage::SpendTxBroadcast("✉  WireMessage::SpendTxBroadcast)")
-    CHAIN_POLL_SwapState::AwaitingLeaderSpend -.-> WireMessage::SecretReveal
-    WireMessage::SecretReveal("✉  WireMessage::SecretReveal") --> x
- 
 
+      WireMessage::LeaderElectionCommitment --> x
+      WireMessage::LeaderElectionNonce --> x
+      MusigRuntime::RoundOne -.-> WireMessage::SchnorrNonce --> x
+      MusigRuntime::RoundTwo -.-> WireMessage::PartialSignature --> x
+      SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast --> x
+%%      CHAIN_POLL_SwapState::AwaitingLeaderSpend -.-> WireMessage::SecretReveal
+      
+      WireMessage::SecretReveal("✉  WireMessage::SecretReveal")
+      
+    end
 ```
  
 ---
