@@ -138,7 +138,7 @@ flowchart TD
         note_for_SpendTxBroadcast("🗎<br>Log")
       end
       
-      subgraph CHAIN_POLL["Chain polling"]
+      subgraph CHAIN_POLL["Chain event handling"]
         poll_match_target -- "ChainPollTarget::LockTx" --> LockTx  --> all_lock_txs_confirmed --> CHAIN_POLL_is_leader
         CHAIN_POLL_is_leader -- "P<sub>leader</sub>" --> SwapState::AwaitingSecrets
         CHAIN_POLL_is_leader{?} -- "P<sub>i≠leader</sub>" --> CHAIN_POLL_SwapState::AwaitingLeaderSpend
