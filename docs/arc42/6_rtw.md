@@ -33,7 +33,7 @@ flowchart TD
 
     %% Two concurrent tokio tasks spawned by run()
   run -- "tokio::spawn (accept loop)" --> NET
-  run -- "tokio::spawn (event loop)" --> event_rx_recv
+  run -- "tokio::spawn (event loop)" --> EVENT
 
   %% ============================================================
   %% Networking subgraph: TCP accept + connection handling
