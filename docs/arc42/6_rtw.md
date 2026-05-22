@@ -120,13 +120,13 @@ flowchart TD
         note_for_LockTxBroadcast("🗎<br>Spawn a chain poller for this party's lock<sup>tx</sup>")
         
         peer_match_target -- ✉ WireMessage::SecretReveal --> SecretReveal --> all_adaptor_secrets_received
-        all_adaptor_secrets_received --> is_leader
-        is_leader -- "P<sub>i≠leader</sub>" --> SwapState::AwaitingLeaderSpend
-        is_leader -- "P<sub>leader</sub>" --> SwapState::Claiming --> broadcast_my_spend_tx --> SwapState::Completed
+        all_adaptor_secrets_received --> MESSAGE_is_leader
+        MESSAGE_is_leader -- "P<sub>i≠leader</sub>" --> MESSAGE_SwapState::AwaitingLeaderSpend
+        MESSAGE_is_leader -- "P<sub>leader</sub>" --> SwapState::Claiming --> broadcast_my_spend_tx --> SwapState::Completed
         
         SecretReveal["WireMessage::SecretReveal(secret)"]
         all_adaptor_secrets_received["utils::all_adaptor_secrets_received(session) ⇒ true"]
-        SwapState::AwaitingLeaderSpend>"SwapState::AwaitingLeaderSpend"]
+        MESSAGE_SwapState::AwaitingLeaderSpend>"SwapState::AwaitingLeaderSpend"]
         SwapState::Claiming>"SwapState::Claiming"]
         broadcast_my_spend_tx["protocol::spend_funds::broadcast_my_spend_tx(session, keys, config)"]
         SwapState::Completed>"SwapState::Completed"]
@@ -137,12 +137,22 @@ flowchart TD
       end
       
       subgraph CHAIN_POLL["Chain polling"]
-        poll_match_target --> ChainPollTarget::LockTx --> maybe_spawn_pollers 
-        poll_match_target --> ChainPollTarget::LeaderSpendTx --> maybe_spawn_pollers
-        poll_match_target --> ChainPollTarget::RefundWindow --> maybe_spawn_pollers
+        poll_match_target --> LockTx  --> all_lock_txs_confirmed --> CHAIN_POLL_is_leader
+        all_lock_txs_confirmed["utils::all_lock_txs_confirmed(session) ⇒ true"]
+        CHAIN_POLL_is_leader{?} -- "P<sub>i≠leader</sub>" --> CHAIN_POLL_SwapState::AwaitingLeaderSpend
+%%        CHAIN_POLL_is_leader -- "P<sub>leader</sub>" --> SwapState::Claiming --> broadcast_my_spend_tx --> SwapState::Completed
+        CHAIN_POLL_SwapState::AwaitingLeaderSpend>"SwapState::AwaitingLeaderSpend"]
+        
+        poll_match_target --> LeaderSpendTx
+        
+        poll_match_target --> RefundWindow 
 
-        maybe_spawn_pollers
+        LockTx("ChainPollTarget::LockTx")
+        LeaderSpendTx("ChainPollTarget::LeaderSpendTx")
+        RefundWindow("ChainPollTarget::RefundWindow")
+
         poll_match_target{?}
+        maybe_spawn_pollers[["daemon.maybe_spawn_pollers(session_id, event_tx)"]]
       end
     end
     
@@ -156,6 +166,8 @@ flowchart TD
     WireMessage::LockTxBroadcast("✉ WireMessage::LockTxBroadcast")
     SwapState::Completed -.-> WireMessage::SpendTxBroadcast --> x
     WireMessage::SpendTxBroadcast("✉  WireMessage::SpendTxBroadcast)")
+    CHAIN_POLL_SwapState::AwaitingLeaderSpend -.-> WireMessage::SecretReveal
+    WireMessage::SecretReveal("✉  WireMessage::SecretReveal") --> x
 
 %%  handle_session_message -.-  DaemonEvent::PeerMessage 
 
