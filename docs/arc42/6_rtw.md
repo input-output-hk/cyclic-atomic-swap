@@ -128,6 +128,7 @@ flowchart TD
         all_adaptor_secrets_received --> MESSAGE_is_leader
         MESSAGE_is_leader -- "P<sub>i≠leader</sub>" --> MESSAGE_SwapState::AwaitingLeaderSpend
         MESSAGE_is_leader -- "P<sub>leader</sub>" --> SwapState::Claiming --> MESSAGE_broadcast_my_spend_tx --> MESSAGE_SwapState::Completed
+        MESSAGE_is_leader{?}
         SecretReveal["WireMessage::SecretReveal(secret)"]
         all_adaptor_secrets_received["utils::all_adaptor_secrets_received(session) ⇒ true"]
         MESSAGE_SwapState::AwaitingLeaderSpend>"SwapState::AwaitingLeaderSpend"]
@@ -146,7 +147,7 @@ flowchart TD
         WireMessage::SchnorrNonce("✉ WireMessage::SchnorrNonce")
         WireMessage::PartialSignature("✉ WireMessage::PartialSignature")
         WireMessage::LockTxBroadcast("✉ WireMessage::LockTxBroadcast")
-        MESSAGE_SwapState::Completed -.-> WireMessage::SpendTxBroadcast 
+        MESSAGE_SwapState::Completed -.-> WireMessage::SpendTxBroadcast
         
         
       end
@@ -205,15 +206,19 @@ flowchart TD
         spawn_pollers
       end
 
-      WireMessage::LeaderElectionCommitment -.-> x
-      WireMessage::LeaderElectionNonce -.-> x
-      MusigRuntime::RoundOne -.-> WireMessage::SchnorrNonce -.-> x
-      MusigRuntime::RoundTwo -.-> WireMessage::PartialSignature -.-> x
-      SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast -.-> x
-      
-      
+      WireMessage::LeaderElectionCommitment -.-> join_to_daemon_event_peer_message
+      WireMessage::LeaderElectionNonce -.-> join_to_daemon_event_peer_message
+      MusigRuntime::RoundOne -.-> WireMessage::SchnorrNonce -.-> join_to_daemon_event_peer_message
+      MusigRuntime::RoundTwo -.-> WireMessage::PartialSignature -.-> join_to_daemon_event_peer_message
+      SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast -.-> join_to_daemon_event_peer_message
+      WireMessage::SpendTxBroadcast -.-> join_to_daemon_event_peer_message
+        
+      join_to_daemon_event_peer_message[\./]
       
     end
+  WireMessage::SecretReveal -.-> z
+    join_to_daemon_event_peer_message -.-> z
+%%    x -.-> z
 ```
  
 ---
