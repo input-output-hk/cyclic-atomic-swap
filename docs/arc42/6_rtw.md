@@ -32,8 +32,8 @@ flowchart TD
     new --> insert_session --> start_swap_session --> run
 
     %% Two concurrent tokio tasks spawned by run()
-    run -- "tokio::spawn (accept loop)" --> NET
-    run -- "tokio::spawn (event loop)" --> EVENT
+  run -- "tokio::spawn (accept loop)" --> NET
+  run -- "tokio::spawn (event loop)" --> event_rx_recv
 
   %% ============================================================
   %% Networking subgraph: TCP accept + connection handling
@@ -140,16 +140,15 @@ flowchart TD
       
       subgraph CHAIN_POLL["Chain polling"]
         poll_match_target -- "ChainPollTarget::LockTx" --> LockTx  --> all_lock_txs_confirmed --> CHAIN_POLL_is_leader
-        CHAIN_POLL_is_leader{?} -- "P<sub>i≠leader</sub>" --> CHAIN_POLL_SwapState::AwaitingLeaderSpend -- trigger --> maybe_spawn_pollers
-        CHAIN_POLL_is_leader -- "P<sub>leader</sub>" --> SwapState::AwaitingSecrets --> maybe_spawn_pollers
+        CHAIN_POLL_is_leader{?} -- "P<sub>i≠leader</sub>" --> CHAIN_POLL_SwapState::AwaitingLeaderSpend
+        CHAIN_POLL_is_leader -- "P<sub>leader</sub>" --> SwapState::AwaitingSecrets 
         LockTx("ChainPollTarget::LockTx { partertecipant_id }")
         all_lock_txs_confirmed["utils::all_lock_txs_confirmed(session) ⇒ true"]
         CHAIN_POLL_SwapState::AwaitingLeaderSpend>"SwapState::AwaitingLeaderSpend"]
         SwapState::AwaitingSecrets>"SwapState::AwaitingSecrets"]
         
         poll_match_target -- "ChainPollTarget::LeaderSpendTx" --> LeaderSpendTx --> check_leader_spend_confirmed --> extract_secret_and_adapt -- "P<sub>leader<</sub>'s spend<sup>tx</sup> on chain?" --> is_extract_secret_and_adapt
-        is_extract_secret_and_adapt -- true --> CHAIN_POLL_SwapState::Claiming --> CHAIN_POLL_broadcast_my_spend_tx --> CHAIN_POLL_SwapState::Completed --> maybe_spawn_pollers
-        is_extract_secret_and_adapt -- false --> maybe_spawn_pollers
+        is_extract_secret_and_adapt -- true --> CHAIN_POLL_SwapState::Claiming --> CHAIN_POLL_broadcast_my_spend_tx --> CHAIN_POLL_SwapState::Completed
         LeaderSpendTx("ChainPollTarget::LeaderSpendTx { leader_id } ")
         check_leader_spend_confirmed["protocol::chain_monitor::check_leader_spend_confirmed(session, leader_id, config) ⇒ true"]
         extract_secret_and_adapt[["extract_secret_and_adapt(session, leader_id, config)"]]
@@ -162,7 +161,6 @@ flowchart TD
         is_done -- false --> check_refund_window_open --> broadcast_my_refund_tx --> is_broadcast_my_refund_tx
         is_broadcast_my_refund_tx -- success --> SwapState::Refunded --> cancel_session_pollers
         is_broadcast_my_refund_tx -- failure --> CHAIN_POLL_SwapState::Failed --> cancel_session_pollers
-        cancel_session_pollers -- interrupt --> maybe_spawn_pollers
         RefundWindow("ChainPollTarget::RefundWindow { participant_id }")
         is_done{?}
         check_refund_window_open[("protocol::chain_monitor::check_refund_window_open(session, participant_id, config) ⇒ true")]
@@ -174,6 +172,13 @@ flowchart TD
         
         
         poll_match_target{?}
+        
+      end
+
+      is_extract_secret_and_adapt -- false --> maybe_spawn_pollers
+      cancel_session_pollers -- interrupt --> maybe_spawn_pollers
+      is_done -- true --> maybe_spawn_pollers
+      subgraph POLL
         maybe_spawn_pollers[["daemon.maybe_spawn_pollers(session_id, event_tx)"]]
       end
     end
