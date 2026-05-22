@@ -113,7 +113,7 @@ flowchart TD
         is_all_partial_sigs_received_for{?}
         finalize_role[["cryptography::multisig::finalize_role(session, keys, role, config)"]]
         all_partial_sigs_received_for_all_refund_and_spend_txs[["utils::all_partial_sigs_received_for_all_refund_and_spend_txs(session) ⇒ true"]]
-        broadcast_my_lock_tx[["protocol::lock_funds::broadcast_my_lock_tx(session, keys, config)"]]
+        broadcast_my_lock_tx[("protocol::lock_funds::broadcast_my_lock_tx(session, keys, config)")]
         is_broadcast_my_lock_tx{?}
         SwapState::AwaitingLockConfirmations>"SwapState::AwaitingLockConfirmations"]
         MESSAGE_SwapState::Failed>"SwapState::Failed"]
@@ -179,7 +179,7 @@ flowchart TD
         CHAIN_POLL_SwapState::AwaitingLeaderSpend --> maybe_spawn_pollers
 
         poll_match_target{?}
-        maybe_spawn_pollers[["daemon.maybe_spawn_pollers(session_id, event_tx)"]]
+        maybe_spawn_pollers["daemon.maybe_spawn_pollers(session_id, event_tx)"]
         
       end
 
