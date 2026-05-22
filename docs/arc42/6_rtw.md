@@ -143,6 +143,7 @@ flowchart TD
         SwapState::AwaitingLeaderElectionNonces -.-> WireMessage::LeaderElectionNonce
         WireMessage::LeaderElectionCommitment("✉ WireMessage::LeaderElectionCommitment")
         WireMessage::LeaderElectionNonce("✉ WireMessage::LeaderElectionNonce")
+        WireMessage::SchnorrNonce("✉ WireMessage::SchnorrNonce")
         WireMessage::PartialSignature("✉ WireMessage::PartialSignature")
         WireMessage::LockTxBroadcast("✉ WireMessage::LockTxBroadcast")
         MESSAGE_SwapState::Completed -.-> WireMessage::SpendTxBroadcast 
@@ -204,11 +205,11 @@ flowchart TD
         spawn_pollers
       end
 
-      WireMessage::LeaderElectionCommitment --> x
-      WireMessage::LeaderElectionNonce --> x
-      MusigRuntime::RoundOne -.-> WireMessage::SchnorrNonce --> x
-      MusigRuntime::RoundTwo -.-> WireMessage::PartialSignature --> x
-      SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast --> x
+      WireMessage::LeaderElectionCommitment -.-> x
+      WireMessage::LeaderElectionNonce -.-> x
+      MusigRuntime::RoundOne -.-> WireMessage::SchnorrNonce -.-> x
+      MusigRuntime::RoundTwo -.-> WireMessage::PartialSignature -.-> x
+      SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast -.-> x
       
       
       
