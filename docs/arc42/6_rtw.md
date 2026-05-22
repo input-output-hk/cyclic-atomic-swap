@@ -169,9 +169,12 @@ flowchart TD
         SwapState::Refunded>"SwapState::Refunded"]
         CHAIN_POLL_SwapState::Failed>"SwapState::Failed"]
         cancel_session_pollers["daemon.cancel_session_pollers(session_id)"]
+        
+        y[\./]
 
-        is_extract_secret_and_adapt -- false --> maybe_spawn_pollers
-        is_done -- true --> maybe_spawn_pollers
+        is_extract_secret_and_adapt -- false --> y
+        is_done -- true --> y
+        y --> maybe_spawn_pollers
         SwapState::AwaitingSecrets --> maybe_spawn_pollers
         CHAIN_POLL_SwapState::AwaitingLeaderSpend --> maybe_spawn_pollers
 
