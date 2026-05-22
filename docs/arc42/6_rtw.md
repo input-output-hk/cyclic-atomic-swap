@@ -122,14 +122,13 @@ flowchart TD
         peer_match_target -- ✉ WireMessage::SecretReveal --> SecretReveal --> all_adaptor_secrets_received
         all_adaptor_secrets_received --> MESSAGE_is_leader
         MESSAGE_is_leader -- "P<sub>i≠leader</sub>" --> MESSAGE_SwapState::AwaitingLeaderSpend
-        MESSAGE_is_leader -- "P<sub>leader</sub>" --> SwapState::Claiming --> broadcast_my_spend_tx --> SwapState::Completed
-        
+        MESSAGE_is_leader -- "P<sub>leader</sub>" --> SwapState::Claiming --> MESSAGE_broadcast_my_spend_tx --> MESSAGE_SwapState::Completed
         SecretReveal["WireMessage::SecretReveal(secret)"]
         all_adaptor_secrets_received["utils::all_adaptor_secrets_received(session) ⇒ true"]
         MESSAGE_SwapState::AwaitingLeaderSpend>"SwapState::AwaitingLeaderSpend"]
         SwapState::Claiming>"SwapState::Claiming"]
-        broadcast_my_spend_tx["protocol::spend_funds::broadcast_my_spend_tx(session, keys, config)"]
-        SwapState::Completed>"SwapState::Completed"]
+        MESSAGE_broadcast_my_spend_tx[["protocol::spend_funds::broadcast_my_spend_tx(session, keys, config)"]]
+        MESSAGE_SwapState::Completed>"SwapState::Completed"]
         
         peer_match_target -- ✉ WireMessage::SpendTxBroadcast --> SpendTxBroadcast --> note_for_SpendTxBroadcast
         SpendTxBroadcast["WireMessage::SpendTxBroadcast"]
@@ -139,11 +138,21 @@ flowchart TD
       subgraph CHAIN_POLL["Chain polling"]
         poll_match_target --> LockTx  --> all_lock_txs_confirmed --> CHAIN_POLL_is_leader
         all_lock_txs_confirmed["utils::all_lock_txs_confirmed(session) ⇒ true"]
-        CHAIN_POLL_is_leader{?} -- "P<sub>i≠leader</sub>" --> CHAIN_POLL_SwapState::AwaitingLeaderSpend
-%%        CHAIN_POLL_is_leader -- "P<sub>leader</sub>" --> SwapState::Claiming --> broadcast_my_spend_tx --> SwapState::Completed
+        CHAIN_POLL_is_leader{?} -- "P<sub>i≠leader</sub>" --> CHAIN_POLL_SwapState::AwaitingLeaderSpend -- trigger --> maybe_spawn_pollers
+        CHAIN_POLL_is_leader -- "P<sub>leader</sub>" --> SwapState::AwaitingSecrets --> maybe_spawn_pollers
         CHAIN_POLL_SwapState::AwaitingLeaderSpend>"SwapState::AwaitingLeaderSpend"]
+        SwapState::AwaitingSecrets>"SwapState::AwaitingSecrets"]
         
-        poll_match_target --> LeaderSpendTx
+        poll_match_target --> LeaderSpendTx --> check_leader_spend_confirmed --> extract_secret_and_adapt -- "P<sub>leader<</sub>'s spend<sup>tx</sup> on chain?" --> is_extract_secret_and_adapt
+        is_extract_secret_and_adapt -- true --> CHAIN_POLL_SwapState::Claiming --> CHAIN_POLL_broadcast_my_spend_tx --> CHAIN_POLL_SwapState::Completed --> maybe_spawn_pollers
+        is_extract_secret_and_adapt -- false --> maybe_spawn_pollers
+        check_leader_spend_confirmed["protocol::chain_monitor::check_leader_spend_confirmed(session, leader_id, config) ⇒ true"]
+        extract_secret_and_adapt[["extract_secret_and_adapt(session, leader_id, config)"]]
+        is_extract_secret_and_adapt{?}
+        CHAIN_POLL_SwapState::Claiming>"CHAIN_POLL_SwapState::Claiming"]
+        CHAIN_POLL_broadcast_my_spend_tx[["protocol::spend_funds::broadcast_my_spend_tx(session, keys, config)"]]
+        CHAIN_POLL_SwapState::Completed>"SwapState::Completed"]
+        
         
         poll_match_target --> RefundWindow 
 
@@ -164,7 +173,7 @@ flowchart TD
     WireMessage::PartialSignature("✉ WireMessage::PartialSignature")
     SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast --> x 
     WireMessage::LockTxBroadcast("✉ WireMessage::LockTxBroadcast")
-    SwapState::Completed -.-> WireMessage::SpendTxBroadcast --> x
+    MESSAGE_SwapState::Completed -.-> WireMessage::SpendTxBroadcast --> x
     WireMessage::SpendTxBroadcast("✉  WireMessage::SpendTxBroadcast)")
     CHAIN_POLL_SwapState::AwaitingLeaderSpend -.-> WireMessage::SecretReveal
     WireMessage::SecretReveal("✉  WireMessage::SecretReveal") --> x
