@@ -140,8 +140,8 @@ flowchart TD
       
       subgraph CHAIN_POLL["Chain polling"]
         poll_match_target -- "ChainPollTarget::LockTx" --> LockTx  --> all_lock_txs_confirmed --> CHAIN_POLL_is_leader
+        CHAIN_POLL_is_leader -- "P<sub>leader</sub>" --> SwapState::AwaitingSecrets
         CHAIN_POLL_is_leader{?} -- "P<sub>i≠leader</sub>" --> CHAIN_POLL_SwapState::AwaitingLeaderSpend
-        CHAIN_POLL_is_leader -- "P<sub>leader</sub>" --> SwapState::AwaitingSecrets 
         LockTx("ChainPollTarget::LockTx { partertecipant_id }")
         all_lock_txs_confirmed["utils::all_lock_txs_confirmed(session) ⇒ true"]
         CHAIN_POLL_SwapState::AwaitingLeaderSpend>"SwapState::AwaitingLeaderSpend"]
@@ -169,22 +169,22 @@ flowchart TD
         SwapState::Refunded>"SwapState::Refunded"]
         CHAIN_POLL_SwapState::Failed>"SwapState::Failed"]
         cancel_session_pollers["daemon.cancel_session_pollers(session_id)"]
-        
-        
+
+        is_extract_secret_and_adapt -- false --> maybe_spawn_pollers
+        is_done -- true --> maybe_spawn_pollers
+        SwapState::AwaitingSecrets --> maybe_spawn_pollers
+        CHAIN_POLL_SwapState::AwaitingLeaderSpend --> maybe_spawn_pollers
+
         poll_match_target{?}
+        maybe_spawn_pollers[["daemon.maybe_spawn_pollers(session_id, event_tx)"]]
         
       end
 
 
-      SwapState::AwaitingSecrets --> maybe_spawn_pollers
-      CHAIN_POLL_SwapState::AwaitingLeaderSpend --> maybe_spawn_pollers
-      cancel_session_pollers -- interrupt --> spawn_pollers
-      is_done -- true --> maybe_spawn_pollers
-      is_extract_secret_and_adapt -- false --> maybe_spawn_pollers
-      
+
+      cancel_session_pollers -- interrupt --> POLL
+      maybe_spawn_pollers --> POLL
       subgraph POLL
-        maybe_spawn_pollers --> spawn_pollers
-        maybe_spawn_pollers[["daemon.maybe_spawn_pollers(session_id, event_tx)"]]
         spawn_pollers
       end
     end
