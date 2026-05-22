@@ -195,7 +195,7 @@ flowchart TD
 
         poll_match_target{?}
         maybe_spawn_pollers["daemon.maybe_spawn_pollers(session_id, event_tx)"]
-        
+        WireMessage::SecretReveal("✉  WireMessage::SecretReveal")
       end
 
       cancel_session_pollers -- interrupt --> POLL
@@ -209,9 +209,8 @@ flowchart TD
       MusigRuntime::RoundOne -.-> WireMessage::SchnorrNonce --> x
       MusigRuntime::RoundTwo -.-> WireMessage::PartialSignature --> x
       SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast --> x
-%%      CHAIN_POLL_SwapState::AwaitingLeaderSpend -.-> WireMessage::SecretReveal
       
-      WireMessage::SecretReveal("✉  WireMessage::SecretReveal")
+      
       
     end
 ```
