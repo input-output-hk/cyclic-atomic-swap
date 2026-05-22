@@ -32,10 +32,21 @@ flowchart TD
     new --> insert_session --> start_swap_session --> run
 
     %% Two concurrent tokio tasks spawned by run()
-  run -- "tokio::spawn (accept loop)" --> NET
   run -- "tokio::spawn (event loop)" --> EVENT
+  run -- "tokio::spawn (accept loop)" --> NET
+  DaemonEvent::PeerMessage_OUT --> NET
 
-  %% ============================================================
+
+  handle_connection -.-> DaemonEvent::PeerMessage
+  DaemonEvent::PeerMessage("✉ DaemonEvent::PeerMessage")
+  DaemonEvent::PeerMessage_IN[\"✉ DaemonEvent::PeerMessage"\]
+  DaemonEvent::PeerMessage_OUT[/"✉ DaemonEvent::PeerMessage"/]
+
+  event_rx_recv --> handle_event
+  DaemonEvent::PeerMessage -.-> event_rx_recv
+
+
+%% ============================================================
   %% Networking subgraph: TCP accept + connection handling
   %% ============================================================
     subgraph NET["Networking task"]
@@ -46,12 +57,6 @@ flowchart TD
       handle_connection["networking::handle_connection(...)"]
     end
 
-    handle_connection -.-> DaemonEvent::PeerMessage 
-    DaemonEvent::PeerMessage("✉ DaemonEvent::PeerMessage")
-
-    event_rx_recv --> handle_event
-    DaemonEvent::PeerMessage -.-> event_rx_recv
-%%    handle_event -.-> listener_accept
 
     %% ============================================================
     %% Event Channel: mpsc channel connecting tasks
@@ -148,8 +153,6 @@ flowchart TD
         WireMessage::PartialSignature("✉ WireMessage::PartialSignature")
         WireMessage::LockTxBroadcast("✉ WireMessage::LockTxBroadcast")
         MESSAGE_SwapState::Completed -.-> WireMessage::SpendTxBroadcast
-        
-        
       end
       
       subgraph CHAIN_POLL["Chain event handling"]
@@ -216,8 +219,8 @@ flowchart TD
       join_to_daemon_event_peer_message[\./]
       
     end
-  WireMessage::SecretReveal -.-> z
-    join_to_daemon_event_peer_message -.-> z
+  WireMessage::SecretReveal -.-> DaemonEvent::PeerMessage_OUT
+  join_to_daemon_event_peer_message -.-> DaemonEvent::PeerMessage_OUT
 %%    x -.-> z
 ```
  
