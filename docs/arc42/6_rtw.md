@@ -2,7 +2,22 @@
 
 ## 6.1 Daemon
 
-[`types::Daemon`](../../swap-daemon/src/daemon.rs)
+The [`types::Daemon`](../../swap-daemon/src/daemon.rs) is the software actor managing the
+swap session on behalf of the party. 
+There is one `Daemon` instance per party.
+
+All daemons cooperate to lead the protocol evolution from one phase to the next one,
+sending [`WireMessage`](../../swap-daemon/src/types.rs) to the other daemons off the chain
+and polling for [`ChainPollTarget`]() events on the chain.
+
+Each daemon assumes a _role_ according to the transaction it commits to the chain.
+
+- deposit: lock<sup>tx</sup> is committed with the default no-role.
+- refund: refund<sup>tx</sup> is committed with `TxRole::Refund`
+- withdraw: spend<sup>tx</sup> is committed with `Tx::Spend`
+
+Each daemon describes the party it represents and the other parties with the
+([`types::Participant`](../../swap-daemon/src/types.rs)) type.
 
 ```mermaid
 flowchart TD
@@ -48,18 +63,69 @@ flowchart TD
       match_event -- ↻ DaemonEvent::ChainPoll --> CHAIN_POLL
       
       subgraph MESSAGE["Message handling"]
-        handle_session_message --> match_target
-        match_target --> ChainPollTarget::LockTx
-        match_target --> ChainPollTarget::LeaderSpendTx
-        match_target --> ChainPollTarget::RefundWindow
-
+        handle_session_message --> peer_match_target
         handle_session_message["session.handle_session_message(wire_message, partecipant_id, keys, config)"]
-        match_target{?}
+        peer_match_target{?}
+        
+        peer_match_target -- ✉ WireMessage::AdaptorPoint --> AdaptorPoint--> all_adaptor_points_received --> SwapState::AwaitingLeaderElectionCommitments --> start_leader_election
+        AdaptorPoint["WireMessage::AdaptorPoint(point)"]
+        all_adaptor_points_received["session.all_adaptor_points_received() ∧ <br>SwapState::AwaitingAdaptorPoints ⇒ true"]
+        SwapState::AwaitingLeaderElectionCommitments>"SwapState::AwaitingLeaderElectionCommitments"]
+        start_leader_election[["leader_election::start_leader_election(session)"]]
+        
+        peer_match_target -- ✉ WireMessage::LeaderElectionCommitment --> LeaderElectionCommitment -- "leader commitment received before starting election?" --> is_electing
+        LeaderElectionCommitment["WireMessage::LeaderElectionCommitment(commitment)"]
+        is_electing -- true --> SwapState::AwaitingLeaderElectionCommitments
+        is_electing --> received_leader_commitment --> all_leader_commitments_received --> broadcast_leader_nonce
+        broadcast_leader_nonce --> SwapState::AwaitingLeaderElectionNonces
+        is_electing{?}
+        received_leader_commitment["leader_election::received_leader_commitment(session, commitment, participant_id)"]
+        all_leader_commitments_received["session.all_leader_commitments_received() ∧ <br>SwapState::AwaitingLeaderElectionCommitments ⇒ true"]
+        broadcast_leader_nonce[["leader_election::broadcast_leader_nonce(session, nonce)"]]
+        SwapState::AwaitingLeaderElectionNonces>"SwapState::AwaitingLeaderElectionNonces"]
+              
+        peer_match_target -- ✉ WireMessage::LeaderElectionNonce --> LeaderElectionNonce --> received_leader_nonce --> all_leader_nonces_received --> compute_leader --> SwapState::RefundAndSpendTxsSigning --> build_lock_txs --> begin_refund_signing --> begin_spend_signing
+        LeaderElectionNonce["WireMessage::LeaderElectionNonce(nonce)"]
+        all_leader_nonces_received["utils::all_leader_nonces_received(session) ∧ <br>session.self.musig_sessions.is_empty() ⇒ true"]
+        compute_leader[["protocol::leader_election::compute_leader(session)"]]
+        SwapState::RefundAndSpendTxsSigning>"SwapState::RefundAndSpendTxsSigning"]
+        build_lock_txs[["protocol::lock_funds::build_lock_txs(session, config)"]]
+        begin_refund_signing[["protocol::refund::begin_refund_signing(session, keys)"]]
+        begin_spend_signing[["protocol::spend::begin_spend_signing(session, keys)"]]
+        
+        peer_match_target -- ✉ WireMessage::SchnorrNonce --> SchnorrNonce --> all_schnorr_nonces_received_for -->  transition_to_round_two --> MusigRuntime::RoundTwo
+        SchnorrNonce["WireMessage::SchnorrNonce(role, nonce)"]
+        all_schnorr_nonces_received_for["utils::all_schnorr_nonces_received_for(session, role) ⇒ true"]
+        transition_to_round_two[["cryptography::multisig::transition_to_round_two(session, keys, role)"]]
+        MusigRuntime::RoundTwo>"MusigRuntime::RoundTwo"]
+        
+        peer_match_target -- ✉ WireMessage::PartialSignature --> PartialSignature
+        PartialSignature["WireMessage::PartialSignature"]
+        
+        peer_match_target -- ✉ WireMessage::LockTxBroadcast --> LockTxBroadcast
+        LockTxBroadcast["WireMessage::LockTxBroadcast"]
+        
+        peer_match_target -- ✉ WireMessage::SecretReveal --> SecretReveal
+        SecretReveal["WireMessage::SecretReveal"]
+        
+        peer_match_target -- ✉ WireMessage::SpendTxBroadcast --> SpendTxBroadcast
+        SpendTxBroadcast["WireMessage::SpendTxBroadcast"]
       end
       
       subgraph CHAIN_POLL["Chain polling"]
+        poll_match_target --> ChainPollTarget::LockTx --> maybe_spawn_pollers 
+        poll_match_target --> ChainPollTarget::LeaderSpendTx --> maybe_spawn_pollers
+        poll_match_target --> ChainPollTarget::RefundWindow --> maybe_spawn_pollers
+
+        maybe_spawn_pollers
+        poll_match_target{?}
       end
     end
+    
+    start_leader_election -.-> WireMessage::LeaderElectionCommitment      
+    WireMessage::LeaderElectionCommitment("✉ WireMessage::LeaderElectionCommitment")
+    broadcast_leader_nonce -.-> WireMessage::LeaderElectionNonce
+    WireMessage::LeaderElectionNonce("✉ WireMessage::LeaderElectionNonce")
 
 %%  handle_session_message -.-  DaemonEvent::PeerMessage 
 
