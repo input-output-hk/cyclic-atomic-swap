@@ -88,18 +88,20 @@ flowchart TD
         SwapState::AwaitingLeaderElectionNonces>"SwapState::AwaitingLeaderElectionNonces"]
               
         peer_match_target -- ✉ WireMessage::LeaderElectionNonce --> LeaderElectionNonce --> received_leader_nonce --> all_leader_nonces_received --> compute_leader --> SwapState::RefundAndSpendTxsSigning --> build_lock_txs --> begin_refund_signing --> begin_spend_signing
+        begin_spend_signing --> MusigRuntime::RoundOne
         LeaderElectionNonce["WireMessage::LeaderElectionNonce(nonce)"]
         all_leader_nonces_received["utils::all_leader_nonces_received(session) ∧ <br>session.self.musig_sessions.is_empty() ⇒ true"]
         compute_leader[["protocol::leader_election::compute_leader(session)"]]
         SwapState::RefundAndSpendTxsSigning>"SwapState::RefundAndSpendTxsSigning"]
         build_lock_txs[["protocol::lock_funds::build_lock_txs(session, config)"]]
         begin_refund_signing[["protocol::refund::begin_refund_signing(session, keys)"]]
+        MusigRuntime::RoundOne>"MusigRuntime::RoundOne"]
         begin_spend_signing[["protocol::spend::begin_spend_signing(session, keys)"]]
         
         peer_match_target -- ✉ WireMessage::SchnorrNonce --> SchnorrNonce --> all_schnorr_nonces_received_for -->  transition_to_round_two --> MusigRuntime::RoundTwo
         SchnorrNonce["WireMessage::SchnorrNonce(role, nonce)"]
         all_schnorr_nonces_received_for["utils::all_schnorr_nonces_received_for(session, role) ⇒ true"]
-        transition_to_round_two[["cryptography::multisig::transition_to_round_two(session, keys, role)"]]
+        transition_to_round_two["cryptography::multisig::transition_to_round_two(session, keys, role)"]
         MusigRuntime::RoundTwo>"MusigRuntime::RoundTwo"]
         
         peer_match_target -- ✉ WireMessage::PartialSignature --> PartialSignature --> all_partial_sigs_received_for --> is_all_partial_sigs_received_for
@@ -196,6 +198,7 @@ flowchart TD
     WireMessage::LeaderElectionCommitment("✉ WireMessage::LeaderElectionCommitment")
     SwapState::AwaitingLeaderElectionNonces -.-> WireMessage::LeaderElectionNonce --> x
     WireMessage::LeaderElectionNonce("✉ WireMessage::LeaderElectionNonce")
+    MusigRuntime::RoundOne -.-> WireMessage::SchnorrNonce --> x
     MusigRuntime::RoundTwo -.-> WireMessage::PartialSignature --> x
     WireMessage::PartialSignature("✉ WireMessage::PartialSignature")
     SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast --> x
@@ -204,8 +207,7 @@ flowchart TD
     WireMessage::SpendTxBroadcast("✉  WireMessage::SpendTxBroadcast)")
     CHAIN_POLL_SwapState::AwaitingLeaderSpend -.-> WireMessage::SecretReveal
     WireMessage::SecretReveal("✉  WireMessage::SecretReveal") --> x
-
-%%  handle_session_message -.-  DaemonEvent::PeerMessage 
+ 
 
 ```
  
