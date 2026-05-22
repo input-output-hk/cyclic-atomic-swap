@@ -99,17 +99,41 @@ flowchart TD
         transition_to_round_two[["cryptography::multisig::transition_to_round_two(session, keys, role)"]]
         MusigRuntime::RoundTwo>"MusigRuntime::RoundTwo"]
         
-        peer_match_target -- ✉ WireMessage::PartialSignature --> PartialSignature
-        PartialSignature["WireMessage::PartialSignature"]
+        peer_match_target -- ✉ WireMessage::PartialSignature --> PartialSignature --> all_partial_sigs_received_for --> is_all_partial_sigs_received_for
+        is_all_partial_sigs_received_for -- true --> finalize_role
+        finalize_role --> all_partial_sigs_received_for_all_refund_and_spend_txs
+        is_all_partial_sigs_received_for -- false --> all_partial_sigs_received_for_all_refund_and_spend_txs --> broadcast_my_lock_tx --> is_broadcast_my_lock_tx
+        is_broadcast_my_lock_tx -- success --> SwapState::AwaitingLockConfirmations
+        is_broadcast_my_lock_tx -- fail --> SwapState::Failed
+        PartialSignature["WireMessage::PartialSignature(role, sig)"]
+        all_partial_sigs_received_for["utils::all_partial_sigs_received_for(session, role)"]
+        is_all_partial_sigs_received_for{?}
+        finalize_role[["cryptography::multisig::finalize_role(session, keys, role, config)"]]
+        all_partial_sigs_received_for_all_refund_and_spend_txs[["utils::all_partial_sigs_received_for_all_refund_and_spend_txs(session) ⇒ true"]]
+        broadcast_my_lock_tx[["protocol::lock_funds::broadcast_my_lock_tx(session, keys, config)"]]
+        is_broadcast_my_lock_tx{?}
+        SwapState::AwaitingLockConfirmations>"SwapState::AwaitingLockConfirmations"]
+        SwapState::Failed>"SwapState::Failed"]
         
-        peer_match_target -- ✉ WireMessage::LockTxBroadcast --> LockTxBroadcast
-        LockTxBroadcast["WireMessage::LockTxBroadcast"]
+        peer_match_target -- ✉ WireMessage::LockTxBroadcast --> LockTxBroadcast --> note_for_LockTxBroadcast
+        LockTxBroadcast["WireMessage::LockTxBroadcast{...}"]
+        note_for_LockTxBroadcast("🗎<br>Spawn a chain poller for this party's lock<sup>tx</sup>")
         
-        peer_match_target -- ✉ WireMessage::SecretReveal --> SecretReveal
-        SecretReveal["WireMessage::SecretReveal"]
+        peer_match_target -- ✉ WireMessage::SecretReveal --> SecretReveal --> all_adaptor_secrets_received
+        all_adaptor_secrets_received --> is_leader
+        is_leader -- "P<sub>i≠leader</sub>" --> SwapState::AwaitingLeaderSpend
+        is_leader -- "P<sub>leader</sub>" --> SwapState::Claiming --> broadcast_my_spend_tx --> SwapState::Completed
         
-        peer_match_target -- ✉ WireMessage::SpendTxBroadcast --> SpendTxBroadcast
+        SecretReveal["WireMessage::SecretReveal(secret)"]
+        all_adaptor_secrets_received["utils::all_adaptor_secrets_received(session) ⇒ true"]
+        SwapState::AwaitingLeaderSpend>"SwapState::AwaitingLeaderSpend"]
+        SwapState::Claiming>"SwapState::Claiming"]
+        broadcast_my_spend_tx["protocol::spend_funds::broadcast_my_spend_tx(session, keys, config)"]
+        SwapState::Completed>"SwapState::Completed"]
+        
+        peer_match_target -- ✉ WireMessage::SpendTxBroadcast --> SpendTxBroadcast --> note_for_SpendTxBroadcast
         SpendTxBroadcast["WireMessage::SpendTxBroadcast"]
+        note_for_SpendTxBroadcast("🗎<br>Log")
       end
       
       subgraph CHAIN_POLL["Chain polling"]
@@ -126,6 +150,12 @@ flowchart TD
     WireMessage::LeaderElectionCommitment("✉ WireMessage::LeaderElectionCommitment")
     broadcast_leader_nonce -.-> WireMessage::LeaderElectionNonce
     WireMessage::LeaderElectionNonce("✉ WireMessage::LeaderElectionNonce")
+    MusigRuntime::RoundTwo -.-> WireMessage::PartialSignature
+    WireMessage::PartialSignature("✉ WireMessage::PartialSignature")
+    SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast 
+    WireMessage::LockTxBroadcast("✉ WireMessage::LockTxBroadcast")
+    SwapState::Completed -.-> WireMessage::SpendTxBroadcast
+    WireMessage::SpendTxBroadcast("✉  WireMessage::SpendTxBroadcast)")
 
 %%  handle_session_message -.-  DaemonEvent::PeerMessage 
 
