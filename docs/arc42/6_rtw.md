@@ -148,7 +148,7 @@ flowchart TD
     
     start_leader_election -.-> WireMessage::LeaderElectionCommitment --> x     
     WireMessage::LeaderElectionCommitment("✉ WireMessage::LeaderElectionCommitment")
-    broadcast_leader_nonce -.-> WireMessage::LeaderElectionNonce --> x
+    SwapState::AwaitingLeaderElectionNonces -.-> WireMessage::LeaderElectionNonce --> x
     WireMessage::LeaderElectionNonce("✉ WireMessage::LeaderElectionNonce")
     MusigRuntime::RoundTwo -.-> WireMessage::PartialSignature --> x
     WireMessage::PartialSignature("✉ WireMessage::PartialSignature")
