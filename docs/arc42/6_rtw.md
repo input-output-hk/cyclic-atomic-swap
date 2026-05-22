@@ -79,7 +79,7 @@ flowchart TD
         peer_match_target -- ✉ WireMessage::LeaderElectionCommitment --> LeaderElectionCommitment -- "leader commitment received before starting election?" --> is_electing
         LeaderElectionCommitment["WireMessage::LeaderElectionCommitment(commitment)"]
         is_electing -- true --> SwapState::AwaitingLeaderElectionCommitments
-        is_electing -- always --> received_leader_commitment --> all_leader_commitments_received --> broadcast_leader_nonce
+        is_electing --> received_leader_commitment --> all_leader_commitments_received --> broadcast_leader_nonce
         broadcast_leader_nonce --> SwapState::AwaitingLeaderElectionNonces
         is_electing{?}
         received_leader_commitment["leader_election::received_leader_commitment(session, commitment, participant_id)"]
@@ -107,7 +107,7 @@ flowchart TD
         finalize_role --> all_partial_sigs_received_for_all_refund_and_spend_txs
         is_all_partial_sigs_received_for -- false --> all_partial_sigs_received_for_all_refund_and_spend_txs --> broadcast_my_lock_tx --> is_broadcast_my_lock_tx
         is_broadcast_my_lock_tx -- success --> SwapState::AwaitingLockConfirmations
-        is_broadcast_my_lock_tx -- fail --> SwapState::Failed
+        is_broadcast_my_lock_tx -- fail --> MESSAGE_SwapState::Failed
         PartialSignature["WireMessage::PartialSignature(role, sig)"]
         all_partial_sigs_received_for["utils::all_partial_sigs_received_for(session, role)"]
         is_all_partial_sigs_received_for{?}
@@ -116,7 +116,7 @@ flowchart TD
         broadcast_my_lock_tx[["protocol::lock_funds::broadcast_my_lock_tx(session, keys, config)"]]
         is_broadcast_my_lock_tx{?}
         SwapState::AwaitingLockConfirmations>"SwapState::AwaitingLockConfirmations"]
-        SwapState::Failed>"SwapState::Failed"]
+        MESSAGE_SwapState::Failed>"SwapState::Failed"]
         
         peer_match_target -- ✉ WireMessage::LockTxBroadcast --> LockTxBroadcast --> note_for_LockTxBroadcast
         LockTxBroadcast["WireMessage::LockTxBroadcast{...}"]
@@ -158,13 +158,19 @@ flowchart TD
         CHAIN_POLL_broadcast_my_spend_tx[("protocol::spend_funds::broadcast_my_spend_tx(session, keys, config)")]
         CHAIN_POLL_SwapState::Completed>"SwapState::Completed"]
         
-        poll_match_target -- "ChainPollTarget::RefundWindow" --> RefundWindow -- "SwapState::Completed<br>⋁ SwapState::Refunded<br> ⋁ SwapState::Failed"--> is_done
-        is_done -- false --> check_refund_window_open --> broadcast_my_refund_tx --> is_broadcast_my_refund_tx 
+        poll_match_target -- "ChainPollTarget::RefundWindow" --> RefundWindow -- "SwapState::Completed<br>⋁ SwapState::Refunded<br> ⋁ SwapState::Failed" --> is_done
+        is_done -- false --> check_refund_window_open --> broadcast_my_refund_tx --> is_broadcast_my_refund_tx
+        is_broadcast_my_refund_tx -- success --> SwapState::Refunded --> cancel_session_pollers
+        is_broadcast_my_refund_tx -- failure --> CHAIN_POLL_SwapState::Failed --> cancel_session_pollers
+        cancel_session_pollers -- interrupt --> maybe_spawn_pollers
         RefundWindow("ChainPollTarget::RefundWindow { participant_id }")
         is_done{?}
         check_refund_window_open[("protocol::chain_monitor::check_refund_window_open(session, participant_id, config) ⇒ true")]
         broadcast_my_refund_tx[("protocol::spend_funds::broadcast_my_refund_tx(session, keys, config)")]
         is_broadcast_my_refund_tx{?}
+        SwapState::Refunded>"SwapState::Refunded"]
+        CHAIN_POLL_SwapState::Failed>"SwapState::Failed"]
+        cancel_session_pollers["daemon.cancel_session_pollers(session_id)"]
         
         
         poll_match_target{?}
