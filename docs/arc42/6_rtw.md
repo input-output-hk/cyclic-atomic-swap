@@ -59,8 +59,8 @@ flowchart TD
       match_event{?}
 
       handle_event --> match_event 
-      match_event -- ✉ DaemonEvent::PeerMessage --> MESSAGE
-      match_event -- ↻ DaemonEvent::ChainPoll --> CHAIN_POLL
+      match_event -- ✉ DaemonEvent::PeerMessage --> handle_session_message
+      match_event -- ↻ DaemonEvent::ChainPoll --> poll_match_target
       
       subgraph MESSAGE["Message handling"]
         handle_session_message --> peer_match_target
@@ -146,15 +146,15 @@ flowchart TD
       end
     end
     
-    start_leader_election -.-> WireMessage::LeaderElectionCommitment      
+    start_leader_election -.-> WireMessage::LeaderElectionCommitment --> x     
     WireMessage::LeaderElectionCommitment("✉ WireMessage::LeaderElectionCommitment")
-    broadcast_leader_nonce -.-> WireMessage::LeaderElectionNonce
+    broadcast_leader_nonce -.-> WireMessage::LeaderElectionNonce --> x
     WireMessage::LeaderElectionNonce("✉ WireMessage::LeaderElectionNonce")
-    MusigRuntime::RoundTwo -.-> WireMessage::PartialSignature
+    MusigRuntime::RoundTwo -.-> WireMessage::PartialSignature --> x
     WireMessage::PartialSignature("✉ WireMessage::PartialSignature")
-    SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast 
+    SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast --> x 
     WireMessage::LockTxBroadcast("✉ WireMessage::LockTxBroadcast")
-    SwapState::Completed -.-> WireMessage::SpendTxBroadcast
+    SwapState::Completed -.-> WireMessage::SpendTxBroadcast --> x
     WireMessage::SpendTxBroadcast("✉  WireMessage::SpendTxBroadcast)")
 
 %%  handle_session_message -.-  DaemonEvent::PeerMessage 
