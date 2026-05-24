@@ -32,19 +32,18 @@ flowchart TD
     new --> insert_session --> start_swap_session --> run
 
     %% Two concurrent tokio tasks spawned by run()
-  run -- "tokio::spawn (event loop)" --> EVENT
+  run -- "tokio::spawn (event loop)" --> event_rx_recv
   run -- "tokio::spawn (accept loop)" --> NET
-  DaemonEvent::PeerMessage_OUT --> NET
+  
 
 
-  handle_connection -.-> DaemonEvent::PeerMessage
-  DaemonEvent::PeerMessage("✉ DaemonEvent::PeerMessage")
-  DaemonEvent::PeerMessage_IN[\"✉ DaemonEvent::PeerMessage"\]
-  DaemonEvent::PeerMessage_OUT[/"✉ DaemonEvent::PeerMessage"/]
-
+  handle_connection --> DaemonEvent::PeerMessage_EVENT
+  DaemonEvent::PeerMessage_EVENT --> event_rx_recv
   event_rx_recv --> handle_event
-  DaemonEvent::PeerMessage -.-> event_rx_recv
-
+  DaemonEvent::PeerMessage_MESSAGE -.-> handle_connection
+  
+  DaemonEvent::PeerMessage_EVENT[/"✉ DaemonEvent::PeerMessage"/]
+  DaemonEvent::PeerMessage_MESSAGE("✉ DaemonEvent::PeerMessage")
 
 %% ============================================================
   %% Networking subgraph: TCP accept + connection handling
@@ -206,7 +205,7 @@ flowchart TD
       cancel_session_pollers -- interrupt --> POLL
       maybe_spawn_pollers --> POLL
       subgraph POLL
-        spawn_pollers
+        spawn_pollers["daemon.spawn_pollers(session_id, target, event_tx)"]
       end
 
       WireMessage::LeaderElectionCommitment -.-> join_to_daemon_event_peer_message
@@ -219,9 +218,9 @@ flowchart TD
       join_to_daemon_event_peer_message[\./]
       
     end
-  WireMessage::SecretReveal -.-> DaemonEvent::PeerMessage_OUT
-  join_to_daemon_event_peer_message -.-> DaemonEvent::PeerMessage_OUT
-%%    x -.-> z
+  WireMessage::SecretReveal -.-> DaemonEvent::PeerMessage_MESSAGE
+  join_to_daemon_event_peer_message -.-> DaemonEvent::PeerMessage_MESSAGE
+  
 ```
  
 ---
