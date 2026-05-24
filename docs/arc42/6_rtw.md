@@ -24,12 +24,16 @@ The function `deamon.run()` spawns internally two parallel loops.
   to react to the received messages, evolve the `SwapSession` properties and sending messages
 - `loop { match event_rx.recv().await {` handles _Tokyo_ inter-process channels events triggered
   peridically (every 10 seconds in this reference implementation) to read transactions’ changes on the chain.
+- Both loops, if `SwapSession.state` is not in final stage 
+  (`SwapState::Completed | SwapState::Refunded | SwapState::Failed`), call
+  `fn maybe_spawn_pollers(&mut self, session_id: SessionId, event_tx: mpsc::Sender<DaemonEvent>)`
+  to eventually activate the on chain pollers according the reached phase of the protocoll.
 
 ```mermaid
 flowchart TD
-%% ============================================================
-%% Lifecycle / bootstrap
-%% ============================================================
+    %% ============================================================
+    %% Lifecycle / bootstrap
+    %% ============================================================
     new["Daemon::new(swap_keys, config)"]
     insert_session["daemon.insert_session(session)"]
     start_swap_session["daemon.start_swap_session(session_id)"]
@@ -38,22 +42,20 @@ flowchart TD
     new --> insert_session --> start_swap_session --> run
 
     %% Two concurrent tokio tasks spawned by run()
-  run -- "tokio::spawn (event loop)" --> event_rx_recv
-  run -- "tokio::spawn (accept loop)" --> NET
-  
+    run -- "tokio::spawn (event loop)" --> event_rx_recv
+    run -- "tokio::spawn (accept loop)" --> NET
+    
+    handle_connection --> DaemonEvent::PeerMessage_EVENT
+    DaemonEvent::PeerMessage_EVENT --> event_rx_recv
+    event_rx_recv --> handle_event
+    DaemonEvent::PeerMessage_MESSAGE -.-> handle_connection
+    
+    DaemonEvent::PeerMessage_EVENT[/"✉ DaemonEvent::PeerMessage"/]
+    DaemonEvent::PeerMessage_MESSAGE("✉ DaemonEvent::PeerMessage")
 
-
-  handle_connection --> DaemonEvent::PeerMessage_EVENT
-  DaemonEvent::PeerMessage_EVENT --> event_rx_recv
-  event_rx_recv --> handle_event
-  DaemonEvent::PeerMessage_MESSAGE -.-> handle_connection
-  
-  DaemonEvent::PeerMessage_EVENT[/"✉ DaemonEvent::PeerMessage"/]
-  DaemonEvent::PeerMessage_MESSAGE("✉ DaemonEvent::PeerMessage")
-
-%% ============================================================
-  %% Networking subgraph: TCP accept + connection handling
-  %% ============================================================
+    %% ============================================================
+    %% Networking subgraph: TCP accept + connection handling
+    %% ============================================================
     subgraph NET["Networking task"]
       listener_accept --> listener_accept
       listener_accept -- "tokio::spawn" --> handle_connection
@@ -159,7 +161,10 @@ flowchart TD
         WireMessage::LockTxBroadcast("✉ WireMessage::LockTxBroadcast")
         MESSAGE_SwapState::Completed -.-> WireMessage::SpendTxBroadcast
       end
-      
+
+      %% ============================================================
+      %% Chain Poll Channel: mpsc channel connecting tasks
+      %% ============================================================
       subgraph CHAIN_POLL["Chain event handling"]
                 
         poll_match_target -- "ChainPollTarget::LeaderSpendTx" --> LeaderSpendTx --> check_leader_spend_confirmed --> extract_secret_and_adapt -- "P<sub>leader<</sub>'s spend<sup>tx</sup> on chain?" --> is_extract_secret_and_adapt
@@ -199,17 +204,18 @@ flowchart TD
         CHAIN_POLL_SwapState::AwaitingLeaderSpend -.-> WireMessage::SecretReveal
         is_extract_secret_and_adapt -- false --> join_to_maybe_spawn_pollers
         is_done -- true --> join_to_maybe_spawn_pollers
-        join_to_maybe_spawn_pollers --> maybe_spawn_pollers
-        SwapState::AwaitingSecrets --> maybe_spawn_pollers
-        CHAIN_POLL_SwapState::AwaitingLeaderSpend --> maybe_spawn_pollers
 
         poll_match_target{?}
-        maybe_spawn_pollers["daemon.maybe_spawn_pollers(session_id, event_tx)"]
         WireMessage::SecretReveal("✉  WireMessage::SecretReveal")
       end
 
+      join_to_maybe_spawn_pollers --> maybe_spawn_pollers
+      SwapState::AwaitingSecrets --> maybe_spawn_pollers
+      CHAIN_POLL_SwapState::AwaitingLeaderSpend --> maybe_spawn_pollers
+      maybe_spawn_pollers["daemon.maybe_spawn_pollers(session_id, event_tx)"]
+
       cancel_session_pollers -- interrupt --> POLL
-      maybe_spawn_pollers --> POLL
+      maybe_spawn_pollers --> spawn_pollers
       subgraph POLL
         spawn_pollers -- 10s --> spawn_pollers  
         spawn_pollers["daemon.spawn_pollers(session_id, target, event_tx)"]
@@ -222,6 +228,7 @@ flowchart TD
       SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast -.-> join_to_daemon_event_peer_message
       WireMessage::SpendTxBroadcast -.-> join_to_daemon_event_peer_message
       WireMessage::SecretReveal -.-> join_to_daemon_event_peer_message
+      join_to_daemon_event_peer_message --> maybe_spawn_pollers
       join_to_daemon_event_peer_message[\./]
 
       spawn_pollers -- tokio::spawn --> DaemonEvent::ChainPoll_EVENT --> event_rx_recv
