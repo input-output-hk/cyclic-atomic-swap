@@ -30,6 +30,9 @@ The function `deamon.run()` spawns internally two parallel loops.
   to eventually activate the on chain pollers according the reached phase of the protocoll.
 
 ```mermaid
+---
+title: "Figure 1: Daemon Flowchart Diagram"
+---
 flowchart TD
     %% ============================================================
     %% Lifecycle / bootstrap
@@ -239,7 +242,9 @@ flowchart TD
   join_to_daemon_event_peer_message -.-> DaemonEvent::PeerMessage_MESSAGE
   
 ```
- 
+
+> Figure 1 zoom and pan [horizontal](6_rtw_daemon_lr.mmd) and [vertical](6_rtw_daemon_td.mmd) orientation.
+
 ---
 
 ## 6.2 Messages
@@ -270,6 +275,9 @@ No messages among parties are exchanged during this phase.
 ### 6.2.2 [Setup Phase](5_bbw_protocol.md#533-setup-phase)
  
 ```mermaid
+---
+title: "Figure 2: Setup Phase Sequence Diagram"
+---
 sequenceDiagram
 %%  Adaptor Point
     participant P_j as All other parties P_j
@@ -335,7 +343,7 @@ sequenceDiagram
             P_i->>P_i: Finalize role (finalize tx).
         end
         P_i->>P_i: All Partial Signatures Received for all txs?
-        opt If all received...
+        opt If all received..
             P_i->>P_i: Transition to ⤞ Funding.
             P_i->>P_i: Broadcast Lock Tx.
             P_i-->>P_j: LockTxBroadcast.
@@ -346,6 +354,9 @@ sequenceDiagram
 ### 6.2.3 [Lock Phase](5_bbw_protocol.md#534-lock-phase)
 
 ```mermaid
+---
+title: "Figure 3: Lock Phase Sequence Diagram"
+---
 sequenceDiagram
     par Lock Tx Broadcast
         participant P_j as All other parties P_j
@@ -359,6 +370,9 @@ sequenceDiagram
 
 ### 6.2.4 [Claim Phase](5_bbw_protocol.md#535-claim-phase)
 ```mermaid
+---
+title: "Figure 4: Claim Phase Sequence Diagram"
+---
 sequenceDiagram
     participant P_j as All other parties P_j
     participant P_leader as This daemon's party P_i is LEADER
@@ -389,6 +403,6 @@ sequenceDiagram
 
 ### 6.2.5 [Refund Phase](5_bbw_protocol.md#536-refund-phase)
 
-The Refund phase runs on chain only and doesn't involve any `WireMessage` exchange off the chain.
+The Refund phase runs on the chain only and doesn't involve any `WireMessage` exchange off the chain.
 
 ---
