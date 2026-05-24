@@ -2,8 +2,7 @@
 
 ## 6.1 Daemon
 
-The [`types::Daemon`](../../swap-daemon/src/daemon.rs) is the software actor managing the
-swap session on behalf of the party. 
+The [`types::Daemon`](../../swap-daemon/src/daemon.rs) is the software actor managing the swap session on behalf of the party. 
 There is one `Daemon` instance per party.
 
 All daemons cooperate to lead the protocol evolution from one phase to the next one,
@@ -18,6 +17,13 @@ Each daemon assumes a _role_ according to the transaction it commits to the chai
 
 Each daemon describes the party it represents and the other parties with the
 ([`types::Participant`](../../swap-daemon/src/types.rs)) type.
+
+The function `deamon.run()` spawns internally two parallel loops.
+- `loop { match listener.accept().await {...` handles network connections, invoking
+  `networking pub async fn handle_connection(socket: TcpStream, from: String, event_tx: mpsc::Sender<DaemonEvent>)`
+  to react to the received messages, evolve the `SwapSession` properties and sending messages
+- `loop { match event_rx.recv().await {` handles _Tokyo_ inter-process channels events triggered
+  peridically (every 10 seconds in this reference implementation) to read transactions’ changes on the chain.
 
 ```mermaid
 flowchart TD
