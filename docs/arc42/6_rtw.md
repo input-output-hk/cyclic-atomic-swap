@@ -214,8 +214,11 @@ flowchart TD
       MusigRuntime::RoundTwo -.-> WireMessage::PartialSignature -.-> join_to_daemon_event_peer_message
       SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast -.-> join_to_daemon_event_peer_message
       WireMessage::SpendTxBroadcast -.-> join_to_daemon_event_peer_message
-        
       join_to_daemon_event_peer_message[\./]
+
+      spawn_pollers --> DaemonEvent::ChainPoll_EVENT --> event_rx_recv
+      DaemonEvent::ChainPoll_EVENT[/"↻ DaemonEvent::ChainPoll"/]
+      
       
     end
   WireMessage::SecretReveal -.-> DaemonEvent::PeerMessage_MESSAGE
