@@ -211,6 +211,7 @@ flowchart TD
       cancel_session_pollers -- interrupt --> POLL
       maybe_spawn_pollers --> POLL
       subgraph POLL
+        spawn_pollers -- 10s --> spawn_pollers  
         spawn_pollers["daemon.spawn_pollers(session_id, target, event_tx)"]
       end
 
@@ -223,7 +224,7 @@ flowchart TD
       WireMessage::SecretReveal -.-> join_to_daemon_event_peer_message
       join_to_daemon_event_peer_message[\./]
 
-      spawn_pollers --> DaemonEvent::ChainPoll_EVENT --> event_rx_recv
+      spawn_pollers -- tokio::spawn --> DaemonEvent::ChainPoll_EVENT --> event_rx_recv
       DaemonEvent::ChainPoll_EVENT[/"↻ DaemonEvent::ChainPoll"/]
       
     end
