@@ -142,6 +142,9 @@ sequenceDiagram
     Note over A,Chain: DONE (refund): A, B, C each recovered their own deposit ? no principal lost
 ```
 
-> Refund windows fire in order W_C < W_B < W_A (earlier window for parties farther from the leader). Each party independently broadcasts their refund tx via `broadcast_my_refund_tx`. No principal is lost.
+> Refund windows fire in order W<sub>C</sub> < W<sub>B</sub> < W<sub>>A</sub>
+> (earlier window for parties farther from the leader).
+> Each party independently broadcasts their refund tx via `broadcast_my_refund_tx`. 
+> No principal is lost.
 
 ---

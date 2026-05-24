@@ -10,7 +10,7 @@ The documentaton of the software architecture follows the
 4. Solution Strategy
 5. [Building Block View](5_bbw.md)
    1. [Protocol](5_bbw_protocol.md) 
-   2. [Finite State Machine](5_bbw_fsm.md)
+   2. [Finite State Machine](5_bbw_fsm_td.mmd)
    3. [Examples](5_bbw_examples.md)
 6. [Runtime View](6_rtw.md)
 7. Deployment view

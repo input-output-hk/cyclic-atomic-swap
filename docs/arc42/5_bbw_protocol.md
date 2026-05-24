@@ -18,7 +18,7 @@ For a swap involving N parties, each party is identified by a number &ge; 0 and 
 The code names the on chain transactions as follows:
 
 - `refund`: it is the refund<sup>tx</sup> P<sub>i</sub> writes on chain to _refund_ itself in case the swap fails.
-- `lock`: it is the lock<sup>tx</sup> P<sub>i<sub/i> writes on chain to _deposit_ its funds \
+- `lock`: it is the lock<sup>tx</sup> P<sub>i</sub> writes on chain to _deposit_ its funds \
   to be withdrawed by P<sub>i+1</sub>.
 - `spend`: it is spend<sup>tx</sup> the transaction when P<sub>i+1</sub> writes on chain
   to  _withdraw_ the funds deposited by P<sub>i</sub>.
@@ -1090,8 +1090,7 @@ On receiving `SecretReveal(t<sub>j</sub>)` from participant j (any party):
 > because the leader holds its own t<sub>leader</sub> from initialisation
 > and receives t<sub>j</sub> from every non-leader via `SecretReveal`.
 > Non-leaders never reach this condition via peer messages (since the leader never broadcasts its secret);
-> instead, they recover t<sub>agg</sub> directly from the on-chain trigger signature
-> (see the next [Claim Phase](#535-claim-phase)).
+> instead, they recover t<sub>agg</sub> directly from the on-chain trigger signature.
 
 ```mermaid
 ---

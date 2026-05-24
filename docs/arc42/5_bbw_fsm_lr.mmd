@@ -1,25 +1,20 @@
-# 5 Building Blocks View – Protocol Finite State Machine
-
-[Left-Right View](fsm.mmd)
-
-```mermaid
 ---
-title: Protocol Finite State Machine
+title: Protocol Finite State Machine - Horizontal Orientation
 ---
-flowchart TD
-%% Config    
+flowchart LR
+    %% Config
     start([
         <b>Start</b>
     ])
     init_daemon["
         <i>initialize daemon</i>
-        
+
         blockchain {bitcoin | cardano}
         network address
         x<sub>i</sub>, X<sub>i</sub>
         -
         </code>daemon::Daemon::new(...)</code>
-    "]
+        "]
     init_daemon_note[
         🗎
         The party has
@@ -71,7 +66,7 @@ flowchart TD
     failure([
         <b>End - Failure</b>
     ])
-    
+
     start --> init_daemon
     init_daemon_note --- init_daemon
     init_swap_session_note --- init_swap_session
@@ -84,8 +79,8 @@ flowchart TD
     end
     run_daemon --> setup_adaptor_point_exchange
     check_swap_session -- invalid --> failure
-    
-%%  Setup - Adaptor Point Exchange
+
+    %%  Setup - Adaptor Point Exchange
     setup_adaptor_point_exchange([
         <b>Setup - Adaptor Point Exchange</b>
     ])
@@ -106,7 +101,7 @@ flowchart TD
     wire_message_adaptor_point("
         ✉ WireMessage::AdaptorPoint(my_point)
     ")
-    
+
     receive_all_adaptor_points["
         <i>receive all</i> T<sub>j</sub>
         -
@@ -120,11 +115,11 @@ flowchart TD
     ")
     failure([
         <b>End - Failure</b>
-    ])  
+    ])
     setup_leader_election([
         <b>Setup - Leader Election</b>
     ])
-    
+
     setup_adaptor_point_exchange --> validate_utxo
     subgraph All - Broadcast
         validate_utxo -- valid UTxO --> broadcast_adaptor_point
@@ -132,24 +127,24 @@ flowchart TD
     end
     validate_utxo -- invalid UtxO --> failure
     broadcast_adaptor_point -.-> wire_message_adaptor_point
-    
+
     swap_state_awaiting_adaptor_points --> receive_all_adaptor_points
     wire_message_adaptor_point -.-> receive_all_adaptor_points
     subgraph All - Receive
         receive_all_adaptor_points --> swap_state_awaiting_leader_election_commitments
     end
-    swap_state_awaiting_leader_election_commitments --> setup_leader_election    
+    swap_state_awaiting_leader_election_commitments --> setup_leader_election
 
-%%  Leader Election
+    %%  Leader Election
     setup_leader_election([
-        <b>Setup - Leader Election</b>
+    <b>Setup - Leader Election</b>
     ])
     start_leader_election_note("
-        🗎
-        nonce n<sub>i</sub>
-        commitment c<sub>i</sub>
+    🗎
+    nonce n<sub>i</sub>
+    commitment c<sub>i</sub>
     ")
-    %%  All - Commit Phase    
+    %%  All - Commit Phase
     start_leader_election["
         <i>set</i> n<sub>i</sub>, c<sub>i</sub>
         -
@@ -187,8 +182,8 @@ flowchart TD
     wire_message_leader_election_nonce("
         ⤞ <u>WireMessage::LeaderElectionNonce</u>
     ")
-    
-    %%  All - Reveal Phase    
+
+    %%  All - Reveal Phase
     receive_all_leader_election_nonce["
         <i>receive all</i> n<sub>j</sub>
         -
@@ -200,7 +195,7 @@ flowchart TD
     "]
     compute_leader["
         <i>compute leader</i>
-        
+
         input = n₀ ‖ n₁ ‖ … ‖ n<sub>N−1</sub>
         seed = SHA256(input)
         v = u64::from_be_bytes(seed[0..8])
@@ -211,15 +206,15 @@ flowchart TD
         <code>session.handle_session_message(...) {{ WireMessage::LeaderElectionNonce { </code>
         <code>utils::all_leader_nonces_received(...) { </code> ⇒ true
         <code>protocol::leader_election::compute_leader(...)</code>
-    "]
+        "]
     swap_state_refund_and_spend_txs_signing("
         ⤞ </u>SwapState::RefundAndSpendTxsSigning</u>
     ")
     setup_musig2_rounds(["
-        <b>Setup - MuSig2 Rounds</b>
+    <b>Setup - MuSig2 Rounds</b>
     "])
-    
-    
+
+
     setup_leader_election --> start_leader_election
     start_leader_election_note --- start_leader_election
     subgraph All - Commit Phase
@@ -234,17 +229,17 @@ flowchart TD
     swap_state_awaiting_leader_election_nonce --> receive_all_leader_election_nonce
     wire_message_leader_election_nonce -.-> receive_all_leader_election_nonce
     subgraph All - Revel Phase
-        receive_all_leader_election_nonce
+       receive_all_leader_election_nonce
     end
     receive_all_leader_election_nonce --> compute_leader
-    
+
     subgraph All - Leader Computation
         compute_leader --> swap_state_refund_and_spend_txs_signing
     end
     swap_state_refund_and_spend_txs_signing --> setup_musig2_rounds
-    
-%%  MuSig2 Rounds
-%%  All - Build Lock Transaction  
+
+    %%  MuSig2 Rounds
+    %%  All - Build Lock Transaction
     setup_musig2_rounds(["
         <b>Setup - MuSig2 Rounds</b>
     "])
@@ -257,7 +252,7 @@ flowchart TD
         <code>utils::all_leader_nonces_received(...) { </code> ⇒ true
         <code>protocol::lock_funds::build_lock_txs(...) { </code>
     "]
-    
+
     %%  All - MuSig2 Round 1
     begin_refund_signing["
         <i>build and sign</i> refund<sup>tx</sup>
@@ -291,7 +286,7 @@ flowchart TD
     wire_message_schnorr_nonce_spend("
         ✉ WireMessage::SchnorrNonce(TxRole::Spend, R<sub>i</sub>)
     ")
-    
+
     %%  All - MuSig2 Round 2
     all_schnorr_nonces_received_for_refund["
         <i>receive all</i> R<sub>j</sub> refund<sup>tx</sup>
@@ -339,7 +334,7 @@ flowchart TD
     wire_message_partial_siganture_spend("
         ✉ WireMessage::PartialSignature(TxRole::Refund, s)
     ")
-    
+
     %%  All - MuSig2 Pre-Signature
     receive_all_partial_signature_refund["
         <i>receive all</i> s<sub>j</sub> for refund<sup>tx</sup>
@@ -365,10 +360,10 @@ flowchart TD
         <code>all_partial_sigs_received_for_all_refund_and_spend_txs(...) { ⇒ true </code>
     ")
     lock(["
-    <b>Lock</b>
+        <b>Lock</b>
     "])
-    
-    
+
+
     setup_musig2_rounds --> build_lock_txs
     subgraph All - Build Lock Transaction
         build_lock_txs
@@ -383,7 +378,7 @@ flowchart TD
     end
     broadcast_refund_schnorr -.-> wire_message_schnorr_nonce_refund
     broadcast_spend_schnorr -.-> wire_message_schnorr_nonce_spend
-    
+
     wire_message_schnorr_nonce_refund -.-> all_schnorr_nonces_received_for_refund
     wire_message_schnorr_nonce_spend -.-> all_schnorr_nonces_received_for_spend
     subgraph All - MuSig2 Round 2 - Partial Pre-Signature Exchange
@@ -394,7 +389,7 @@ flowchart TD
     end
     broadcast_aggregated_schnorr_nonce_refund -.-> wire_message_partial_siganture_refund
     broadcast_aggregated_schnorr_nonce_spend -.-> wire_message_partial_siganture_spend
-    
+
     wire_message_partial_siganture_refund -.-> receive_all_partial_signature_refund
     wire_message_partial_siganture_spend -.-> receive_all_partial_signature_spend
     subgraph All - MuSig2 Pre-Signature
@@ -402,8 +397,8 @@ flowchart TD
         receive_all_partial_signature_spend --> swap_state_funding
     end
     swap_state_funding --> lock
-    
-%%  Lock
+
+    %%  Lock
     lock(["
         <b>Lock</b>
     "])
@@ -435,12 +430,12 @@ flowchart TD
     failure([
         <b>End - Failure</b>
     ])
-    
+
     wire_message_lock_transaction_broadcast[
         ✉  WireMessage::LockTxBroadcast
     ]
-    
-    %%  All - withdrawer    
+
+    %%  All - withdrawer
     receive_lock["
         <i>receive</i> lock<sup>tx</sup><sub>j</sub>
         -
@@ -470,8 +465,8 @@ flowchart TD
     refund(["
         <b>Refund</b>
     "])
-    
-    
+
+
     lock -- in parallel --> write_lock
     lock -- in parallel --> read_lock
     subgraph "All - depositor P<sub>i</sub> of lock<sup>tx</sup><sub>i</sub>"
@@ -481,7 +476,7 @@ flowchart TD
     write_lock -- failure --> swap_state_failed
     swap_state_failed --> failure
     broadcast_lock -.-> wire_message_lock_transaction_broadcast
-    
+
     wire_message_lock_transaction_broadcast -.-> receive_lock
     subgraph "All - withdrawer P<sub>i+1 mod N</sub>"
         swap_state_awaiting_lock_confirmations --> receive_lock
@@ -492,13 +487,13 @@ flowchart TD
     end
     read_all_lock -- all confirmed --> claim
     read_all_lock -- refund window timeout trigger --> refund
-    
-%%  Claim - Secret Reveal   
+
+    %%  Claim - Secret Reveal
     claim(["
         <b>Claim</b>
     "])
-    
-    %%  Leader    
+
+    %%  Leader
     swap_state_awaiting_secrets("
         ⤞ <u>SwapState::AwaitingSecrets</u>
         -
@@ -520,11 +515,11 @@ flowchart TD
         -
         <code>my_id == leader_id { </code> ⇒ true
     ")
-    
+
     wire_message_secret_reveal("
         ✉ WireMessage::SecretReveal
     ")
-    
+
     %%  All Not Leader
     cast_secret["
         <i>cast to P<sub>leader</sub></i> s<sub>i</sub>
@@ -540,7 +535,7 @@ flowchart TD
     refund(["
         <b>Refund</b>
     "])
-    
+
     claim -- P<sub>i ≠ leader</sub> --> cast_secret
     claim -- P<sub>leader</sub> --> swap_state_awaiting_secrets
     subgraph All - Not Leader
@@ -552,12 +547,12 @@ flowchart TD
         swap_state_awaiting_secrets --> receive_all_secrets
         receive_all_secrets --> swap_state_claiming_leader
     end
-%%    swap_state_claiming_leader --> claim_spend
-%%    swap_state_awaiting_leader_spend --> claim_spend
+    %%    swap_state_claiming_leader --> claim_spend
+    %%    swap_state_awaiting_leader_spend --> claim_spend
     swap_state_claiming_not_leader -- refund windows timeout trigger --> refund
     swap_state_awaiting_leader_spend -- refund windows timeout trigger --> refund
 
-%%  Claim - Spend 
+    %%  Claim - Spend
     %%  Leader Only
     write_spend_tx_leader[("
         <i>sign and write</i> spend<sup>tx</sup><sub>leader</sub>
@@ -586,10 +581,10 @@ flowchart TD
     success_leader(["
         <b>End - Success</b>
     "])
-    
-    
 
-%%  All Not Leader
+
+
+    %%  All Not Leader
     receive_spend_tx_leader["
         <i>receive</i> spend<sup>tx</sup><sub>leader</sub>
         -
@@ -648,8 +643,8 @@ flowchart TD
         🗎
         Log
     ")
-    
-    
+
+
     wire_message_spend_tx_broadcast("
         ✉ WireMessage::SpendTxBroadcast
     ")
@@ -681,8 +676,8 @@ flowchart TD
     broadcast_spend_tx_leader -.-> wire_message_spend_tx_broadcast_leader
     swap_state_completed_leader --> success_leader
     success_leader -- interrupt --> refund
-    
-%%  Refund
+
+    %%  Refund
     read_block_height[("
         ↻ <i>read block height</i>
         -
@@ -716,5 +711,3 @@ flowchart TD
     write_refund_tx -- failure --> swap_state_failed
     swap_state_refunded --> success
     success -- interrupt --> claim
-    
-```

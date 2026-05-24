@@ -419,7 +419,11 @@ stateDiagram-v2
     Refund --> [*]
 ```
 
-Follow the above links for the [detailed explanation of the protocol](5_bbw_protocol.md) building blocks.
+Follow the above links for the [detailed explanation of the protocol](5_bbw_protocol.md) building blocks,
+the comprehensive state diagram of the protocol is visible in
+[horizontal](5_bbw_fsm_lr.mmd) or
+[vertical](5_bbw_fsm_td.mmd) orientation.
+
 
 ---
 
