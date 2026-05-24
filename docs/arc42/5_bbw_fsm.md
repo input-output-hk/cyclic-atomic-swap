@@ -1,5 +1,7 @@
 # 5 Building Blocks View – Protocol Finite State Machine
 
+[Left-Right View](fsm.mmd)
+
 ```mermaid
 ---
 title: Protocol Finite State Machine
