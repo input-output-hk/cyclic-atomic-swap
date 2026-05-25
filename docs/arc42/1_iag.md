@@ -23,6 +23,10 @@ of the [Cardano 2030 Strategic Framework](https://product.cardano.intersectmbo.o
 interoperability **protocol** to enable trust-minimised cross-chain execution, 
 un-tapping dormient Bitcoin liquidity to complex finance operations through Cardano as a reliable infrastructure.**
  
+![Use Case](1_iag_uc.svg)
+
+> Figure 1: CANS Protocol - Use Case Diagram: three parties, three blockchains.
+
 ---
 
 ## 1.2 Goals
@@ -56,6 +60,39 @@ un-tapping dormient Bitcoin liquidity to complex finance operations through Card
    the properties of the CANS protocol.
 4. Publish a [**Reference Implementation**](../../swap-daemon) 
    to demonstrate the feasibility and usability of the CANS protocol.
+
+```mermaid
+sequenceDiagram
+    actor Alice
+    participant Bitcoin
+    actor Bob
+    participant Cardano
+    actor Charlie
+    critical Must behave atomically
+        par Alice to Bob
+            Alice ->> Bitcoin: "Deposit BTC to Bob"
+            activate Bitcoin
+            Bob ->> Bitcoin: "Withdraw BTC from Alice"
+            Bitcoin -->> Bob: BTC
+            deactivate Bitcoin
+        and Bob to Charlie
+            Bob ->> Cardano: "Deposit ADA to Charlie"
+            activate Cardano
+            Charlie ->> Cardano: "Withdraw ADA from Bob"
+            Cardano -->> Charlie: ADA
+            deactivate Cardano
+        and Charlie to Alice
+            Charlie ->> Bitcoin: "Deposit BTC to Alice"
+            activate Bitcoin
+            Alice ->> Bitcoin: "Withdraw BTC from Charlie"
+            Bitcoin -->> Alice: BTC
+            deactivate Bitcoin
+        end
+    end
+
+```
+
+> Figure 2: CANS Protocol - Sequence Diagram: three parties, two blockchains.
 
 ---
 
