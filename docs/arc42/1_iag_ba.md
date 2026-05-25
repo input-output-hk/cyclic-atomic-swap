@@ -37,7 +37,7 @@ An atomic swap protocol guarantees that
 
 - if all parties follow the protocol, all swaps complete successfully;
 - if any coalition deviates, no honest participant ends up worse off;
-- and no rational group has incentive to deviate.
+- and no rational group has an incentive to deviate.
 
 Traditionally implemented via hashed timelock contracts (HTLCs),
 these protocols are now evolving toward more efficient cryptographic models using multi‑signature

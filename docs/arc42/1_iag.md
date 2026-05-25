@@ -2,83 +2,60 @@
 
 ## 1.1 Requirements
 
-### 1.1.1 Motivations
+Bitcoin has the largest store of value in crypto, approx $1 trillion in market cap, not earning interest.
 
-Bridges are the primary pathway for capital to enter the Cardano ecosystem,
+Cardano has rich programmable finance: oracles, DEXs, lending and borrowing, liquid stacking – but not Bitcoin’s
+liquidity.
+
+_Bridges_ or _Central Exchange_ (CEX) operators are the primary pathway for capital to enter the Cardano ecosystem,
 yet they remain one of the highest-risk components in blockchain systems.
 
 While multiple interoperability solutions are emerging
 – such as Bitcoin bridges, cross-chain messaging layers, and native atomic swaps –
 their security assumptions, adversarial resilience,
-and operational guarantees are not yet fully formalised or independently validated at a system level.
-Bridges, being a single point of failure, have lost >$2B to exploits.
+and operational guarantees are not yet fully formalised or independently validated at a system level:
+bridges have lost >$2B to exploits so far.
 
-At the same time, blockchains remain largely passive systems, unable to act directly within external environments.
-Untapped liquidity: Bitcoin has the largest store of value in crypto, approx $1 trillion in market cap, not earning
-interest.
+The [Business Analisis](1_iag_ba.md) describes the market opportunity and motivates the need for this work as an element 
+of the [Cardano 2030 Strategic Framework](https://product.cardano.intersectmbo.org/vision/strategy-2030/).
 
-Cardano has rich programmable finance: oracles, DEXs, lending & borrowing, liquid stacking – but not Bitcoin’s
-liquidity.
-
-
-
+**This work focuses on delivering high-assurance security foundations and trust-minimal
+interoperability **protocol** to enable trust-minimised cross-chain execution, 
+un-tapping dormient Bitcoin liquidity to complex finance operations through Cardano as a reliable infrastructure.**
+ 
 ---
-
-This system-level work therefore focuses on delivering high-assurance security foundations and trust-minimal
-interoperability protocols that strengthen existing bridge infrastructure, enable trust-minimised cross-chain execution,
-and position Cardano as a reliable coordination layer across ecosystems. external system interaction.
-(i) Formal Security Analysis of Bridge Infrastructure
-
-
-If you sell one for the othe, lose exposure and potentially taxable event.
-
-
-CEXs impose custody risk, KYC requirements, and settlement delays
-Atomic swaps require no custodian, no shared pool. You own the asset.
-HTLC-based atomic swaps publish a common hash on both chains — trivially linking both swap legs for chain analysts
-HTLC ring swaps lock sequentially — each hop waits for the previous confirmation, making total lock time O(N ×
-block_time); timeouts must be staggered by the same factor
-Goal: Atomic swap that is efficient, trustless, private, and has minimal on-chain footprint
----
-
-This stream develops trust-minimised mechanisms for cross-chain asset exchange without intermediaries. Using adaptor
-signatures and multi-party constructions, it enables atomic settlement across assets and chains, including 2-party and
-n-party swap protocols (eg, CANS).
-These primitives form the foundation for intent-based cross-chain execution, where users express high-level outcomes,
-and solvers coordinate fulfillment through atomic transaction bundles. The work evaluates scalability, composability,
-and deployment feasibility, with the goal of providing secure, reusable building blocks for interoperability.
-
 
 ## 1.2 Goals
 
-Bitcoin scripting is intentionally limited for security reasons, so no native lending, no DEX, no stable-coins.
-
-Enabling Cardano to function as an active coordination layer
-– through secure cross-chain execution, threshold signing, and asset control –
-requires new cryptographic primitives and stronger formal guarantees.
-
-
-Either all spend txs complete, or all refunds fire. If any participant aborts, time-locked refunds guarantee no
-participant loses funds
-N-party: Scales to N participants — same ring protocol handles 3 or 20 counterparties with no structural changes
-Supports same-chain or cross-chain legs (BTC ↔ ADA, ADA ↔ ADA, BTC ↔ BTC)
-Participants need only trust the cryptographic protocol — not each other
-Scriptless on Bitcoin: Taproot key-path spend is indistinguishable from a regular transfer
-Happy path is quick (refund is no quicker)
-
-```mermaid
-zenuml
-    @Actor Alice
-    @Database Bitcoin
-    @Actor Bob
-    Alice->Bitcoin. "Deposit BTC to Bob" { 
-        Bob->Bitcoin. "Withdraw BTC from Alice" {
-        return "BTC Alice->Bob"
-        }
-    }
-    
- 
-```
+1. Propose a **Cyclic Atomic N-party Swap (CANS) Protocol** to combine complex multi-party operations
+   as it would be a single swap operation.
+   1. **CYCLIC**: P<sub>1</sub> → P<sub>2</sub> → … → P<sub>n</sub> → P<sub>1</sub>: 
+    each participant sends exactly once and receives exactly once.
+   2. **ATOMIC**: Either all spend txs complete, or all refunds fire.
+     If any participant aborts, time-locked refunds guarantee no participant loses funds
+   3. **N-party**: Scales to N participants with no structural changes.
+   4. Supports same-chain or cross-chain legs (BTC ↔ ADA, ADA ↔ ADA, BTC ↔ BTC).
+   5. Participants need only trust the cryptographic protocol — not each other.
+   6. Scriptless on Bitcoin: Taproot key-path spend is indistinguishable from a regular transfer
+2. Model the **Cyclic Atomic N-party Swap (CANS) Protocol** to address risks of competing solutions.
+   1. <u>Bridges</u>
+      1. Bridges use wrapped tokens (lets you keep exposure) that you can then yield; CANS protocol doesn't.
+      2. Most bridges require a trusted third-party/custodian to upgrade the contract logic, pause or drain the bridge;
+         CANS protocol doesn't.
+      3. Don't require any asset custodian to trust.
+   2. <u>Hash-based Time Lock Contracts (HTLC)</u>
+      1. CEXs impose custody risk, _Know Your Customer_ (KYC) requirements, and settlement delays; 
+       CANS protocol requires no custodian, no shared pool. You own the asset.
+      2. HTLC-based atomic swaps publish a common hash on both chains — trivially linking both swap legs for chain analysts;
+      CANS transactions are indistinguishable from any other transaction in the blockchains involved.   
+      3. HTLC ring swaps lock sequentially — each hop waits for the previous confirmation, 
+      making total lock time O(N × block_time); timeouts must be staggered by the same factor;
+      CANS is efficient, has minimal on-chain footprint, 
+      and meaningfully faster to succeed if all parties reach the consensus.
+3. Provide a [**Formal Methods**](https://en.wikipedia.org/wiki/Formal_methods) model to verify the correctness for
+   the properties of the CANS protocol.
+4. Publish a [**Reference Implementation**](../../swap-daemon) 
+   to demonstrate the feasibility and usability of the CANS protocol.
 
 ---
 
