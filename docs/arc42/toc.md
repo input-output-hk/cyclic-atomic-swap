@@ -1,10 +1,10 @@
 # Software Architecture
 ## Table of Contents
 
-The documentaton of the software architecture follows the
+The documentation of the software architecture follows the
 [arc42 documentation](https://docs.arc42.org/home/) template.
 
-1. Introduction and goals
+1. [Introduction and goals](1_iag.md) 
 2. Architecture Constraints
 3. Context and Scope
 4. Solution Strategy
