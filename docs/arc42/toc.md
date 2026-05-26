@@ -6,9 +6,9 @@ The documentation of the software architecture follows the
 
 1. [Introduction and goals](1_iag.md)
    1. [Business Analysis](1_iag_ba.md)
-2. Architecture Constraints
-3. Context and Scope
-4. Solution Strategy
+2. [Architecture Constraints](2_ac.md)
+3. [Context and Scope](3_cas.md)
+4. [Solution Strategy](4_ss.md)
 5. [Building Block View](5_bbw.md)
    1. [Protocol](5_bbw_protocol.md) 
    2. [Finite State Machine](5_bbw_fsm_td.mmd)
