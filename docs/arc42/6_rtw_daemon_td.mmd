@@ -1,0 +1,207 @@
+flowchart TD
+%% ============================================================
+%% Lifecycle / bootstrap
+%% ============================================================
+    new["Daemon::new(swap_keys, config)"]
+    insert_session["daemon.insert_session(session)"]
+    start_swap_session["daemon.start_swap_session(session_id)"]
+    run["daemon.run()"]
+
+    new --> insert_session --> start_swap_session --> run
+
+%% Two concurrent tokio tasks spawned by run()
+    run -- "tokio::spawn (event loop)" --> event_rx_recv
+    run -- "tokio::spawn (accept loop)" --> NET
+
+    handle_connection --> DaemonEvent::PeerMessage_EVENT
+    DaemonEvent::PeerMessage_EVENT --> event_rx_recv
+    event_rx_recv --> handle_event
+    DaemonEvent::PeerMessage_MESSAGE -.-> handle_connection
+
+    DaemonEvent::PeerMessage_EVENT[/"✉ DaemonEvent::PeerMessage"/]
+    DaemonEvent::PeerMessage_MESSAGE("✉ DaemonEvent::PeerMessage")
+
+%% ============================================================
+%% Networking subgraph: TCP accept + connection handling
+%% ============================================================
+    subgraph NET["Networking task"]
+        listener_accept --> listener_accept
+        listener_accept -- "tokio::spawn" --> handle_connection
+
+        listener_accept["listener.accept()"]
+        handle_connection["networking::handle_connection(...)"]
+    end
+
+
+%% ============================================================
+%% Event Channel: mpsc channel connecting tasks
+%% ============================================================
+    subgraph EVENT["Event handling task"]
+        event_rx_recv["event_rx_recv()"]
+        handle_event["daemon.handle_event(event, event_tx)"]
+        match_event{?}
+
+        handle_event --> match_event
+        match_event -- ✉ DaemonEvent::PeerMessage --> handle_session_message
+        match_event -- ↻ DaemonEvent::ChainPoll --> poll_match_target
+
+        subgraph MESSAGE["Message handling"]
+            handle_session_message --> peer_match_target
+            handle_session_message["session.handle_session_message(wire_message, partecipant_id, keys, config)"]
+            peer_match_target{?}
+
+            peer_match_target -- ✉ WireMessage::AdaptorPoint --> AdaptorPoint--> all_adaptor_points_received --> SwapState::AwaitingLeaderElectionCommitments --> start_leader_election
+            AdaptorPoint["WireMessage::AdaptorPoint(point)"]
+            all_adaptor_points_received["session.all_adaptor_points_received() ∧ <br>SwapState::AwaitingAdaptorPoints ⇒ true"]
+            SwapState::AwaitingLeaderElectionCommitments>"SwapState::AwaitingLeaderElectionCommitments"]
+            start_leader_election[["leader_election::start_leader_election(session)"]]
+
+            peer_match_target -- ✉ WireMessage::LeaderElectionCommitment --> LeaderElectionCommitment -- "leader commitment received before starting election?" --> is_electing
+            LeaderElectionCommitment["WireMessage::LeaderElectionCommitment(commitment)"]
+            is_electing -- true --> SwapState::AwaitingLeaderElectionCommitments
+            is_electing --> received_leader_commitment --> all_leader_commitments_received --> broadcast_leader_nonce
+            broadcast_leader_nonce --> SwapState::AwaitingLeaderElectionNonces
+            is_electing{?}
+            received_leader_commitment["leader_election::received_leader_commitment(session, commitment, participant_id)"]
+            all_leader_commitments_received["session.all_leader_commitments_received() ∧ <br>SwapState::AwaitingLeaderElectionCommitments ⇒ true"]
+            broadcast_leader_nonce[["leader_election::broadcast_leader_nonce(session, nonce)"]]
+            SwapState::AwaitingLeaderElectionNonces>"SwapState::AwaitingLeaderElectionNonces"]
+
+            peer_match_target -- ✉ WireMessage::LeaderElectionNonce --> LeaderElectionNonce --> received_leader_nonce --> all_leader_nonces_received --> compute_leader --> SwapState::RefundAndSpendTxsSigning --> build_lock_txs --> begin_refund_signing --> begin_spend_signing
+            begin_spend_signing --> MusigRuntime::RoundOne
+            LeaderElectionNonce["WireMessage::LeaderElectionNonce(nonce)"]
+            all_leader_nonces_received["utils::all_leader_nonces_received(session) ∧ <br>session.self.musig_sessions.is_empty() ⇒ true"]
+            compute_leader[["protocol::leader_election::compute_leader(session)"]]
+            SwapState::RefundAndSpendTxsSigning>"SwapState::RefundAndSpendTxsSigning"]
+            build_lock_txs[["protocol::lock_funds::build_lock_txs(session, config)"]]
+            begin_refund_signing[["protocol::refund::begin_refund_signing(session, keys)"]]
+            MusigRuntime::RoundOne>"MusigRuntime::RoundOne"]
+            begin_spend_signing[["protocol::spend::begin_spend_signing(session, keys)"]]
+
+            peer_match_target -- ✉ WireMessage::SchnorrNonce --> SchnorrNonce --> all_schnorr_nonces_received_for -->  transition_to_round_two --> MusigRuntime::RoundTwo
+            SchnorrNonce["WireMessage::SchnorrNonce(role, nonce)"]
+            all_schnorr_nonces_received_for["utils::all_schnorr_nonces_received_for(session, role) ⇒ true"]
+            transition_to_round_two["cryptography::multisig::transition_to_round_two(session, keys, role)"]
+            MusigRuntime::RoundTwo>"MusigRuntime::RoundTwo"]
+
+            peer_match_target -- ✉ WireMessage::PartialSignature --> PartialSignature --> all_partial_sigs_received_for --> is_all_partial_sigs_received_for
+            is_all_partial_sigs_received_for -- true --> finalize_role
+            finalize_role --> all_partial_sigs_received_for_all_refund_and_spend_txs
+            is_all_partial_sigs_received_for -- false --> all_partial_sigs_received_for_all_refund_and_spend_txs --> broadcast_my_lock_tx --> is_broadcast_my_lock_tx
+            is_broadcast_my_lock_tx -- success --> SwapState::AwaitingLockConfirmations
+            is_broadcast_my_lock_tx -- fail --> MESSAGE_SwapState::Failed
+            PartialSignature["WireMessage::PartialSignature(role, sig)"]
+            all_partial_sigs_received_for["utils::all_partial_sigs_received_for(session, role)"]
+            is_all_partial_sigs_received_for{?}
+            finalize_role[["cryptography::multisig::finalize_role(session, keys, role, config)"]]
+            all_partial_sigs_received_for_all_refund_and_spend_txs[["utils::all_partial_sigs_received_for_all_refund_and_spend_txs(session) ⇒ true"]]
+            broadcast_my_lock_tx[("protocol::lock_funds::broadcast_my_lock_tx(session, keys, config)")]
+            is_broadcast_my_lock_tx{?}
+            SwapState::AwaitingLockConfirmations>"SwapState::AwaitingLockConfirmations"]
+            MESSAGE_SwapState::Failed>"SwapState::Failed"]
+
+            peer_match_target -- ✉ WireMessage::LockTxBroadcast --> LockTxBroadcast --> note_for_LockTxBroadcast
+            LockTxBroadcast["WireMessage::LockTxBroadcast{...}"]
+            note_for_LockTxBroadcast("🗎<br>Spawn a chain poller for this party's lock<sup>tx</sup>")
+
+            peer_match_target -- ✉ WireMessage::SecretReveal --> SecretReveal --> all_adaptor_secrets_received
+            all_adaptor_secrets_received --> MESSAGE_is_leader
+            MESSAGE_is_leader -- "P<sub>i≠leader</sub>" --> MESSAGE_SwapState::AwaitingLeaderSpend
+            MESSAGE_is_leader -- "P<sub>leader</sub>" --> SwapState::Claiming --> MESSAGE_broadcast_my_spend_tx --> MESSAGE_SwapState::Completed
+            MESSAGE_is_leader{?}
+            SecretReveal["WireMessage::SecretReveal(secret)"]
+            all_adaptor_secrets_received["utils::all_adaptor_secrets_received(session) ⇒ true"]
+            MESSAGE_SwapState::AwaitingLeaderSpend>"SwapState::AwaitingLeaderSpend"]
+            SwapState::Claiming>"SwapState::Claiming"]
+            MESSAGE_broadcast_my_spend_tx[("protocol::spend_funds::broadcast_my_spend_tx(session, keys, config)")]
+            MESSAGE_SwapState::Completed>"SwapState::Completed"]
+
+            peer_match_target -- ✉ WireMessage::SpendTxBroadcast --> SpendTxBroadcast --> note_for_SpendTxBroadcast
+            SpendTxBroadcast["WireMessage::SpendTxBroadcast"]
+            note_for_SpendTxBroadcast("🗎<br>Log")
+
+            start_leader_election -.-> WireMessage::LeaderElectionCommitment
+            SwapState::AwaitingLeaderElectionNonces -.-> WireMessage::LeaderElectionNonce
+            WireMessage::LeaderElectionCommitment("✉ WireMessage::LeaderElectionCommitment")
+            WireMessage::LeaderElectionNonce("✉ WireMessage::LeaderElectionNonce")
+            WireMessage::SchnorrNonce("✉ WireMessage::SchnorrNonce")
+            WireMessage::PartialSignature("✉ WireMessage::PartialSignature")
+            WireMessage::LockTxBroadcast("✉ WireMessage::LockTxBroadcast")
+            MESSAGE_SwapState::Completed -.-> WireMessage::SpendTxBroadcast
+        end
+
+    %% ============================================================
+    %% Chain Poll Channel: mpsc channel connecting tasks
+    %% ============================================================
+        subgraph CHAIN_POLL["Chain event handling"]
+
+            poll_match_target -- "ChainPollTarget::LeaderSpendTx" --> LeaderSpendTx --> check_leader_spend_confirmed --> extract_secret_and_adapt -- "P<sub>leader<</sub>'s spend<sup>tx</sup> on chain?" --> is_extract_secret_and_adapt
+            is_extract_secret_and_adapt -- true --> CHAIN_POLL_SwapState::Claiming --> CHAIN_POLL_broadcast_my_spend_tx --> CHAIN_POLL_SwapState::Completed -- interrupt --> cancel_session_pollers
+            LeaderSpendTx("ChainPollTarget::LeaderSpendTx { leader_id } ")
+            check_leader_spend_confirmed["protocol::chain_monitor::check_leader_spend_confirmed(session, leader_id, config) ⇒ true"]
+            extract_secret_and_adapt[["extract_secret_and_adapt(session, leader_id, config)"]]
+            is_extract_secret_and_adapt{?}
+            CHAIN_POLL_SwapState::Claiming>"CHAIN_POLL_SwapState::Claiming"]
+            CHAIN_POLL_broadcast_my_spend_tx[("protocol::spend_funds::broadcast_my_spend_tx(session, keys, config)")]
+            CHAIN_POLL_SwapState::Completed>"SwapState::Completed"]
+
+            poll_match_target -- "ChainPollTarget::RefundWindow" --> RefundWindow -- "SwapState::Completed<br>⋁ SwapState::Refunded<br> ⋁ SwapState::Failed" --> is_done
+            is_done -- false --> check_refund_window_open --> broadcast_my_refund_tx --> is_broadcast_my_refund_tx
+            is_broadcast_my_refund_tx -- success --> SwapState::Refunded --> cancel_session_pollers
+            is_broadcast_my_refund_tx -- failure --> CHAIN_POLL_SwapState::Failed --> cancel_session_pollers
+            RefundWindow("ChainPollTarget::RefundWindow { participant_id }")
+            is_done{?}
+            check_refund_window_open[("protocol::chain_monitor::check_refund_window_open(session, participant_id, config) ⇒ true")]
+            broadcast_my_refund_tx[("protocol::spend_funds::broadcast_my_refund_tx(session, keys, config)")]
+            is_broadcast_my_refund_tx{?}
+            SwapState::Refunded>"SwapState::Refunded"]
+            CHAIN_POLL_SwapState::Failed>"SwapState::Failed"]
+            cancel_session_pollers["daemon.cancel_session_pollers(session_id)"]
+
+            poll_match_target -- "ChainPollTarget::LockTx" --> LockTx  --> all_lock_txs_confirmed --> CHAIN_POLL_is_leader
+            CHAIN_POLL_is_leader -- "P<sub>leader</sub>" --> SwapState::AwaitingSecrets
+            CHAIN_POLL_is_leader{?} -- "P<sub>i≠leader</sub>" --> CHAIN_POLL_SwapState::AwaitingLeaderSpend
+            LockTx("ChainPollTarget::LockTx { partertecipant_id }")
+            all_lock_txs_confirmed["utils::all_lock_txs_confirmed(session) ⇒ true"]
+            CHAIN_POLL_SwapState::AwaitingLeaderSpend>"SwapState::AwaitingLeaderSpend"]
+            SwapState::AwaitingSecrets>"SwapState::AwaitingSecrets"]
+
+            join_to_maybe_spawn_pollers[\./]
+
+            WireMessage::SpendTxBroadcast("✉  WireMessage::SpendTxBroadcast)")
+            CHAIN_POLL_SwapState::AwaitingLeaderSpend -.-> WireMessage::SecretReveal
+            is_extract_secret_and_adapt -- false --> join_to_maybe_spawn_pollers
+            is_done -- true --> join_to_maybe_spawn_pollers
+
+            poll_match_target{?}
+            WireMessage::SecretReveal("✉  WireMessage::SecretReveal")
+        end
+
+        join_to_maybe_spawn_pollers --> maybe_spawn_pollers
+        SwapState::AwaitingSecrets --> maybe_spawn_pollers
+        CHAIN_POLL_SwapState::AwaitingLeaderSpend --> maybe_spawn_pollers
+        maybe_spawn_pollers["daemon.maybe_spawn_pollers(session_id, event_tx)"]
+
+        cancel_session_pollers -- interrupt --> POLL
+        maybe_spawn_pollers --> spawn_pollers
+        subgraph POLL
+            spawn_pollers -- 10s --> spawn_pollers
+            spawn_pollers["daemon.spawn_pollers(session_id, target, event_tx)"]
+        end
+
+        WireMessage::LeaderElectionCommitment -.-> join_to_daemon_event_peer_message
+        WireMessage::LeaderElectionNonce -.-> join_to_daemon_event_peer_message
+        MusigRuntime::RoundOne -.-> WireMessage::SchnorrNonce -.-> join_to_daemon_event_peer_message
+        MusigRuntime::RoundTwo -.-> WireMessage::PartialSignature -.-> join_to_daemon_event_peer_message
+        SwapState::AwaitingLockConfirmations -.-> WireMessage::LockTxBroadcast -.-> join_to_daemon_event_peer_message
+        WireMessage::SpendTxBroadcast -.-> join_to_daemon_event_peer_message
+        WireMessage::SecretReveal -.-> join_to_daemon_event_peer_message
+        join_to_daemon_event_peer_message --> maybe_spawn_pollers
+        join_to_daemon_event_peer_message[\./]
+
+        spawn_pollers -- tokio::spawn --> DaemonEvent::ChainPoll_EVENT --> event_rx_recv
+        DaemonEvent::ChainPoll_EVENT[/"↻ DaemonEvent::ChainPoll"/]
+
+    end
+
+    join_to_daemon_event_peer_message -.-> DaemonEvent::PeerMessage_MESSAGE
