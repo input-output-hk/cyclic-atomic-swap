@@ -21,7 +21,7 @@ It leverages adaptor signatures to facilitate secure and non-interactive swaps a
 1. Presentation
 2. [Protocol Specification](docs/protocol-spec.pdf)
 3. [Software Architecture](docs/arc42/toc.md)
-4. [Reference Implemntation](swap-daemon/README.md)
+4. [Reference Implementation](swap-daemon/README.md)
 5. [Formal Methods](formal-methods/README.md) 
 
 ---
