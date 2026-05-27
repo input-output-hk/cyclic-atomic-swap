@@ -3,11 +3,23 @@
 The reference implementation is a demonstration of a decentralised swap protocol between Bitcoin and Cardano blockchains. 
 It showcases the integration of two blockchains and the use of smart contracts implementing the CANS protocol.
 
-
-
 ## 3.1 Business Context
 
-[`swap-daemon`](../../swap-daemon) provides the software to be integrated with the party's wallet
+The [`swap-daemon`](../../swap-daemon) provides the software _daemon_ to be integrated with the party's wallet.
+The _daemon_ handles a swap descriptor for the party it represents and the other parties it interacts with to complete
+the swap session.
+
+- The index **i** identifies the party the daemon represents
+- The index **j** identifies the other parties the daemon interacts with.
+
+
+Each _daemon_ implements the [Finite State Machine](5_bbw_protocol.md) FSM the CANS protocol describes.
+
+Each _daemon_ interacts with the blockchains.
+This reference implementation provides integration code for Bitcoin and Cardano.
+
+Each _daemon_ exchanges messages with the other daemons, messages allow the distributed FSM instances to evolve to the 
+success or failure of the swap session. 
 
 ```mermaid
 C4Context
@@ -33,19 +45,26 @@ C4Context
     }
     BiRel(swap_daemon_j, bitcoin, "use")
     BiRel(swap_daemon_j, cardano, "use")
-    BiRel(swap_daemon_j, network, "use")
+    BiRel(swap_daemon_j, network, "exchange messages")
 
-    SystemQueue(network, "Network")
-    
+
     System_Boundary(blockchain_environment, "Blockchain Environment") {
         Container_Boundary(btc_defi_atomic_swaps_test_env, "BTC DeFi Test Rig",, "https://github.com/input-output-hk/btc-defi-atomic-swaps-test-env") {
             ContainerDb(bitcoin, "Bitcoin", "Docker Container", "Blockchain")
             ContainerDb(cardano, "Cardano", "Docker Container", "Blockchain")
         }
     }
+    
+    SystemQueue(network, "Network")
 ```
 
 ## 3.2 Technical Context
+
+The reference implementation doesn't provide a party's wallet.
+The wallet (keys, assets) and the terms and conditions of the swap are represented by the Swap Descriptor
+
+TO DO: Define the swap descriptor.
+
 
 ```mermaid
 C4Container
