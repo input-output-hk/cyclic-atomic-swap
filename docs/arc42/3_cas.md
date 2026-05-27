@@ -1,6 +1,13 @@
 # 3. Context and Scope
 
+The reference implementation is a demonstration of a decentralised swap protocol between Bitcoin and Cardano blockchains. 
+It showcases the integration of two blockchains and the use of smart contracts implementing the CANS protocol.
+
+
+
 ## 3.1 Business Context
+
+[`swap-daemon`](../../swap-daemon) provides the software to be integrated with the party's wallet
 
 ```mermaid
 C4Context
@@ -75,11 +82,11 @@ C4Container
     Rel(swap_descriptor, swap_session, "define")
     Rel(blockchain, swap_validator, "use")
     Rel(dashboard_client_ui, dashboard_api_server, "use", "REST API")
-    BiRel(blockchain, bitcoin, "read/write", "Electrs TCP/IP Port 3002")
-    BiRel(blockchain, cardano, "read/write", "Dolos TCP/IP Port 50051/50052")
+    BiRel(blockchain, bitcoin, "read/write", "Electrs TCP Port 3002")
+    BiRel(blockchain, cardano, "read/write", "Dolos TCP Port 50051/50052")
     BiRel(networking, p_j_daemon, "Pluggable Transport Layer", "Network")
-    BiRel(p_j_daemon, bitcoin, "read/write", "Electrs TCP/IP Port 3002")
-    BiRel(p_j_daemon, cardano, "read/write", "Dolos TCP/IP Port 50051/50052")
+    BiRel(p_j_daemon, bitcoin, "read/write", "Electrs TCP Port 3002")
+    BiRel(p_j_daemon, cardano, "read/write", "Dolos TCP Port 50051/50052")
 
 
 ```
