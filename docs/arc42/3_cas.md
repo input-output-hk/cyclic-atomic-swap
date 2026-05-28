@@ -1,11 +1,20 @@
 # 3. Context and Scope
 
-The reference implementation is a demonstration of a decentralised swap protocol between Bitcoin and Cardano blockchains. 
+The reference implementation provides a concrete demonstration of the CANS protocol 
+between Bitcoin and Cardano blockchains. 
 It showcases the integration of two blockchains and the use of smart contracts implementing the CANS protocol.
 
 ## 3.1 Business Context
 
 The [`swap-daemon`](../../swap-daemon) provides the software _daemon_ to be integrated with the party's wallet.
+
+In the business context, it is supposed each daemon for each party to represent runs in a separate process inside
+a separate enterprise boundary.
+The Enterprise boundary should bot be interpreted as on premisis services running in servers 
+installed inside the walls of a company.
+Imagining a Kubernetes cluster of pods on clouds, the set containers running the daemons representing a party are
+a valid enterprise boundary.
+
 The _daemon_ handles a swap descriptor for the party it represents and the other parties it interacts with to complete
 the swap session.
 
@@ -13,13 +22,14 @@ the swap session.
 - The index **j** identifies the other parties the daemon interacts with.
 
 
-Each _daemon_ implements the [Finite State Machine](5_bbw_protocol.md) FSM the CANS protocol describes.
+Each _daemon_ implements the [Finite State Machine](5_bbw_protocol.md) (FSM) the CANS protocol describes.
 
-Each _daemon_ interacts with the blockchains.
+Each _daemon_ interacts with the blockchain.
 This reference implementation provides integration code for Bitcoin and Cardano.
+Each daemon interacts with Bitcoin or Cardano. 
 
-Each _daemon_ exchanges messages with the other daemons, messages allow the distributed FSM instances to evolve to the 
-success or failure of the swap session. 
+Each _daemon_ exchanges messages with the other daemons, the messages allow the distributed FSM instances to evolve to 
+the success or failure of the swap session. 
 
 ```mermaid
 C4Context
@@ -61,29 +71,41 @@ C4Context
 ## 3.2 Technical Context
 
 The reference implementation doesn't provide a party's wallet.
-The wallet (keys, assets) and the terms and conditions of the swap are represented by the Swap Descriptor
+The wallet (keys, assets) and the terms and conditions of the swap are represented by the 
+[`SwapSession`](../../swap-daemon/src/types.rs) and injected into the [`swap-daemon`](../../swap-daemon/src/daemon.rs) 
+via the `pub fn insert_session(&mut self, session: SwapSession)` method.
 
-TO DO: Define the swap descriptor.
+The [lib.rs](../../swap-daemon/src/lib.rs) exposes what is needed to build a crate representing
+a party or building a runtime rig serving the multiple parties of the CANS protocol.
 
+Tests code at [regtest](../../swap-daemon/tests/regtest) provides a runtime rig for testing the swap daemon
+hosting up to twenty parties.
+
+Daemons use a pluggable transport layer to connect through the network to other demons, TCP is used by default.
+Daemons are blockchain API clients
+- **Bitcoin**: Electrs API TCP Port 3002
+- **Cardano**, Dolos API TCP Port 50051/50052"
 
 ```mermaid
 C4Container
     title "Figure 2: Reference Implementation Technical Context"
     System_Boundary(test_rig, "Cyclic Atomic N-Party Swap Reference Implementation Demo Rig") {
-        Container(swap_descriptor, "Swap Descriptor", "`swap-daemon`")
+        Container(swap_descriptor, "daemon.insertSession(session: SwapSession)", "`swap-daemon`")
         Container(swap_validator, "Swap Validator", "`swap-validator`", "Plutus Smart Contract")
-        Container_Boundary(daemon, "This Party i<br/>-<br/>`swap-daemon`") {
-            System(swap_session, "Swap Session")
-            System(protocol, "Protocol")
-            Component(cryptography, "Cryptography<br/>MuSig2")
-            Component(blockchain, "Blockchain")
-            Component(dashboard_api_server, "Dashboard API Server")
-            Component(networking, "Networking")
-            BiRel(swap_session, protocol, "represent")
-            Rel(protocol, blockchain, "use")
-            Rel(protocol, cryptography, "use")
-            Rel(protocol, networking, "use")
-            Rel(protocol, dashboard_api_server, "use")
+        System_Boundary(lib_i, "swap-daemon/src/lib.rs") {
+            Container_Boundary(daemon, "This Party i<br/>-<br/>`swap-daemon`") {
+                System(swap_session, "Swap Session")
+                System(protocol, "Protocol")
+                Component(cryptography, "Cryptography<br/>MuSig2")
+                Component(blockchain, "Blockchain")
+                Component(dashboard_api_server, "Dashboard API Server")
+                Component(networking, "Networking")
+                BiRel(swap_session, protocol, "represent")
+                Rel(protocol, blockchain, "use")
+                Rel(protocol, cryptography, "use")
+                Rel(protocol, networking, "use")
+                Rel(protocol, dashboard_api_server, "use")
+            }
         }
         System_Boundary(blockchain_environment, "Blockchain Environment") {
             Container_Boundary(btc_defi_atomic_swaps_test_env, "BTC DeFi Test Rig",, "https://github.com/input-output-hk/btc-defi-atomic-swaps-test-env") {
@@ -94,10 +116,13 @@ C4Container
         Container_Boundary(dashboard_vite, "Vite Service<br/>-<br/>`dashboard`") {
             System(dashboard_client_ui, "Dashboard Client UI")
         }
-        Container_Boundary(p_j, "Other Party j<br/>-<br/>`swap-daemon`") {
-            Container(p_j_daemon, "Swap Daemon")
+        System_Boundary(lib_j, "swap-daemon/src/lib.rs") {
+            Container_Boundary(p_j, "Other Party j<br/>-<br/>`swap-daemon`") {
+                Container(p_j_daemon, "Swap Daemon")
+            }
         }
     }
+
     Rel(swap_descriptor, swap_session, "define")
     Rel(blockchain, swap_validator, "use")
     Rel(dashboard_client_ui, dashboard_api_server, "use", "REST API")
