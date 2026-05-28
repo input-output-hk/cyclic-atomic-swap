@@ -27,9 +27,9 @@
 
 - Distribute the software with a [test rig](../../swap-daemon/tests) and a UI [dashboard](../../dashboard) to visualise
   the reference implementation running live.
-- Use the [architectural documentation](../../arc42) as a map between the theoretical [protocol specification](../protocol-spec.pdf)
+- Use the [architectural documentation](toc.md) as a map between the theoretical [protocol specification](../protocol-spec.pdf)
   and its concrete [reference implementation](../../swap-daemon), use UML diagrams to visualise the relation between
-  theory and code, see [5. Building Blocks View](5_bbw.md) and [6. Runtime View](6_rtv.md).
+  theory and code, see [5. Building Blocks View](5_bbw.md) and [6. Runtime View](6_rtw.md).
 - Full document the [reference implementation](../../swap-daemon) code.
 
  
