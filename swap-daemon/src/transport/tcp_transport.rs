@@ -1,22 +1,19 @@
-
-// 
-// receive
-
-// read
-// write
-
-// put
-// get
-
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-pub struct TcpTransport {
-    
+pub struct TcpTransport<S = TcpStream> {
+    stream: S
 }
 
-impl TcpTransport {
-    pub async fn send(tcpStream: &mut TcpStream, src: &[u8]) -> tokio::io::Result<()> {
-         tcpStream.write_all(src).await
+impl<S> TcpTransport<S> 
+where 
+    S: AsyncWrite + Unpin
+{
+    pub fn new(stream: S) -> Self {
+        Self { stream }
+    }
+    
+    pub async fn send(&mut self, src: &[u8]) -> tokio::io::Result<()> {
+        self.stream.write_all(src).await
     }
 }

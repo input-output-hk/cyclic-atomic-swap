@@ -4,7 +4,7 @@ use crate::transport::connection_pool::ConnectionPool;
 use crate::types::{DaemonEvent, Envelope};
 use serde_json;
 use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    io::{AsyncBufReadExt, BufReader},
     net::TcpStream,
     sync::{mpsc, Mutex},
 };
@@ -77,7 +77,8 @@ pub async fn broadcast(
 
             let mut stream = stream_arc.lock().await;
             // if let Err(e) = stream.write_all(&framed).await {
-            if let Err(e) = TcpTransport::send(&mut *stream, &framed).await {
+
+            if let Err(e) = TcpTransport::new(&mut *stream).send(&framed).await {
                 error!("failed to write to {}: {}", addr, e);
                 pool.lock().await.remove(&addr);
             }
