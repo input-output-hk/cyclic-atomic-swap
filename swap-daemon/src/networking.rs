@@ -9,38 +9,8 @@ use tokio::{
     sync::{mpsc, Mutex},
 };
 use tracing::{error, info};
+use crate::transport::tcp_transport::TcpTransport;
 
-
-/// Asynchronously handles an incoming connection from a TCP client.
-///
-/// This function reads lines of data from the provided `TcpStream`, parses each message into an
-/// envelope, and forwards the parsed message as a `DaemonEvent` through the given `mpsc::Sender`.
-/// If the connection is closed or an error occurs, the function will exit gracefully.
-///
-/// # Parameters
-///
-/// * `socket` - The `TcpStream` representing the connection with the client.
-/// * `from` - A `String` identifying the source of the connection (e.g., an IP address or hostname).
-/// * `event_tx` - An `mpsc::Sender<DaemonEvent>` used to send parsed messages to another part of the system for further handling.
-///
-/// # Returns
-///
-/// * `Ok(())` - Indicates that the connection was handled successfully or closed without errors.
-/// * `Err(Box<dyn std::error::Error + Send + Sync>)` - Returns an error if there was a failure
-///   during message handling, such as an I/O error, parsing error, or channel send failure.
-///
-/// # Errors
-///
-/// The function returns an error if:
-/// * Reading from the `TcpStream` fails.
-/// * Parsing the line into an envelope fails.
-/// * Sending a `DaemonEvent` through the channel fails.
-///
-/// # Notes
-///
-/// * Ensure that the `event_tx` sender has sufficient capacity to handle the incoming messages, as
-///   exhausting the channel capacity may result in a deadlock or message loss.
-/// * The function assumes that the incoming messages are line-delimited and properly formatted.
 pub async fn handle_connection(
     socket: TcpStream,
     from: String,
@@ -63,59 +33,11 @@ pub async fn handle_connection(
     Ok(())
 }
 
-/// Parses a JSON string into an `Envelope` object.
-///
-/// # Parameters
-/// - `line`: A `&str` containing the JSON string representation of an `Envelope`.
-///
-/// # Returns
-/// - `Ok(Envelope)` if the provided string is successfully parsed into an `Envelope` object.
-/// - `Err(Box<dyn std::error::Error + Send + Sync>)` if parsing fails due to an invalid JSON format or other parsing-related errors.
-///
-/// # Errors
-/// This function will return an error if:
-/// - The input string is not a valid JSON.
-/// - The JSON structure does not match the expected structure of the `Envelope` type.
-///
 pub fn parse_envelope(line: &str) -> Result<Envelope, Box<dyn std::error::Error + Send + Sync>> {
     let envelope: Envelope = serde_json::from_str(line)?;
     Ok(envelope)
 }
 
-/// Broadcasts a message to multiple addresses asynchronously.
-///
-/// This function takes a list of target `addresses`, a reference to an `Envelope` object
-/// containing the message payload, and a `ConnectionPool`. It serializes the `Envelope`
-/// into a payload, appends a newline character to the payload, and attempts to send it
-/// to all provided addresses via TCP connections.
-///
-/// # Parameters
-///
-/// * `addresses` - A slice of `String`s representing the target addresses to which the
-///   message should be sent.
-/// * `envelope` - A reference to the `Envelope` object that contains the message payload.
-/// * `pool` - A reference to the shared `ConnectionPool` that manages active TCP connections.
-///
-/// # Returns
-///
-/// A `Result` which is:
-/// * `Ok(())` - If the operation is successful and the messages were either delivered or no
-///   fatal error occurred.
-/// * `Err(Box<dyn std::error::Error>)` - If an error occurred during payload serialization.
-///
-/// # Errors
-///
-/// - If the `envelope` cannot be serialized into JSON (`serde_json::to_vec` failure), the function
-///   immediately returns an error.
-/// - If a TCP connection attempt fails, an error is logged, but the execution continues for other addresses.
-/// - If a write operation to a stream fails, the respective connection is removed from the pool, and
-///   the error is logged.
-///
-/// # Notes
-///
-/// - Logging errors requires configuring proper error logging (e.g., using `log` crate).
-/// - Careful consideration should be given to how large the `addresses` slice is, since each
-///   address creates an independent async task.
 pub async fn broadcast(
     addresses: &[String],
     envelope: &Envelope,
@@ -154,7 +76,8 @@ pub async fn broadcast(
             };
 
             let mut stream = stream_arc.lock().await;
-            if let Err(e) = stream.write_all(&framed).await {
+            // if let Err(e) = stream.write_all(&framed).await {
+            if let Err(e) = TcpTransport::send(&mut *stream, &framed).await {
                 error!("failed to write to {}: {}", addr, e);
                 pool.lock().await.remove(&addr);
             }
