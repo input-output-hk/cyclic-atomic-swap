@@ -1,6 +1,7 @@
 use tracing::{error, info};
 use crate::{
     networking::broadcast,
+    transport::tcp::{TcpTransport, TcpConnector},
     types::{Envelope, SwapSession, WireMessage},
     utils::{get_my_id, get_other_addresses},
 };
@@ -34,7 +35,7 @@ pub async fn broadcast_adaptor_point(session: &SwapSession) {
         WireMessage::AdaptorPoint(my_point),
     );
 
-    if let Err(e) = broadcast(&other_addresses, &envelope, &session.connection_pool).await {
+    if let Err(e) = broadcast::<TcpTransport, TcpConnector>(&other_addresses, &envelope, &session.connection_pool).await {
         error!("broadcast failed: {e}");
     }
 }

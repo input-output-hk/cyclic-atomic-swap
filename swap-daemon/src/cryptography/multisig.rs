@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::{
     blockchains::{bitcoin_utils::taproot_key_agg_ctx, cardano_utils},
     networking::broadcast,
+    transport::tcp::{TcpTransport, TcpConnector},
     types::{
         Blockchain, DaemonConfig, Envelope, MusigRuntime, SwapKeys, SwapSession, TxRole,
         WireMessage,
@@ -134,7 +135,7 @@ pub async fn transition_to_round_two(
         my_id,
         WireMessage::PartialSignature { role, sig: sig_hex },
     );
-    if let Err(e) = broadcast(&addresses, &envelope, &session.connection_pool).await {
+    if let Err(e) = broadcast::<TcpTransport, TcpConnector>(&addresses, &envelope, &session.connection_pool).await {
         error!("broadcast partial sig failed for role {:?}: {e}", role);
     }
 }

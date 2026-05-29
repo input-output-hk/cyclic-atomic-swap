@@ -11,6 +11,7 @@ use crate::{
         cardano_utils::{self, sign_cardano_lock_tx, submit_cardano_tx, CARDANO_MAINNET, CARDANO_TESTNET},
     },
     networking::broadcast,
+    transport::tcp::{TcpTransport, TcpConnector},
     types::{BitcoinNetwork, Blockchain, CardanoNetwork, DaemonConfig, Envelope, SwapKeys, SwapSession, WireMessage},
     utils::{get_my_id, get_other_addresses, refund_locktime_cardano},
 };
@@ -145,7 +146,7 @@ pub async fn broadcast_my_lock_tx(
 
     let addresses = get_other_addresses(&session.participants);
     let envelope = Envelope::new(session.id, my_id, WireMessage::LockTxBroadcast);
-    if let Err(e) = broadcast(&addresses, &envelope, &session.connection_pool).await {
+    if let Err(e) = broadcast::<TcpTransport, TcpConnector>(&addresses, &envelope, &session.connection_pool).await {
         error!("broadcast lock tx notification failed: {e}");
     }
 

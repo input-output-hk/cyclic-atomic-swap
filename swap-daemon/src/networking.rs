@@ -1,25 +1,25 @@
 use std::sync::Arc;
+use bytes::Bytes;
 
 use crate::transport::connection_pool::ConnectionPool;
+use crate::transport::{Transport, Connector};
 use crate::types::{DaemonEvent, Envelope};
 use serde_json;
 use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-    net::TcpStream,
     sync::{mpsc, Mutex},
 };
 use tracing::{error, info};
 
 
-/// Asynchronously handles an incoming connection from a TCP client.
+/// Asynchronously handles an incoming connection from a client using a pluggable Transport.
 ///
-/// This function reads lines of data from the provided `TcpStream`, parses each message into an
+/// This function reads data from the provided `Transport`, parses each message into an
 /// envelope, and forwards the parsed message as a `DaemonEvent` through the given `mpsc::Sender`.
 /// If the connection is closed or an error occurs, the function will exit gracefully.
 ///
 /// # Parameters
 ///
-/// * `socket` - The `TcpStream` representing the connection with the client.
+/// * `transport` - The `Transport` representing the connection with the client.
 /// * `from` - A `String` identifying the source of the connection (e.g., an IP address or hostname).
 /// * `event_tx` - An `mpsc::Sender<DaemonEvent>` used to send parsed messages to another part of the system for further handling.
 ///
@@ -32,31 +32,34 @@ use tracing::{error, info};
 /// # Errors
 ///
 /// The function returns an error if:
-/// * Reading from the `TcpStream` fails.
-/// * Parsing the line into an envelope fails.
+/// * Reading from the `Transport` fails.
+/// * Parsing the data into an envelope fails.
 /// * Sending a `DaemonEvent` through the channel fails.
 ///
-/// # Notes
-///
-/// * Ensure that the `event_tx` sender has sufficient capacity to handle the incoming messages, as
-///   exhausting the channel capacity may result in a deadlock or message loss.
-/// * The function assumes that the incoming messages are line-delimited and properly formatted.
-pub async fn handle_connection(
-    socket: TcpStream,
+pub async fn handle_connection<T: Transport>(
+    mut transport: T,
     from: String,
     event_tx: mpsc::Sender<DaemonEvent>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let reader = BufReader::new(socket);
-    let mut lines = reader.lines();
-
-    while let Some(line) = lines.next_line().await? {
-        let envelope = parse_envelope(&line)?;
-        event_tx
-            .send(DaemonEvent::PeerMessage {
-                envelope: envelope,
-                from: from.clone(),
-            })
-            .await?;
+    loop {
+        match transport.receive().await {
+            Ok(data) => {
+                let line = std::str::from_utf8(&data)?;
+                let envelope = parse_envelope(line)?;
+                event_tx
+                    .send(DaemonEvent::PeerMessage {
+                        envelope: envelope,
+                        from: from.clone(),
+                    })
+                    .await?;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                break;
+            }
+            Err(e) => {
+                return Err(Box::new(e));
+            }
+        }
     }
 
     info!("Connection closed by {}", from);
@@ -82,19 +85,18 @@ pub fn parse_envelope(line: &str) -> Result<Envelope, Box<dyn std::error::Error 
     Ok(envelope)
 }
 
-/// Broadcasts a message to multiple addresses asynchronously.
+/// Broadcasts a message to multiple addresses asynchronously using a pluggable Transport.
 ///
 /// This function takes a list of target `addresses`, a reference to an `Envelope` object
 /// containing the message payload, and a `ConnectionPool`. It serializes the `Envelope`
-/// into a payload, appends a newline character to the payload, and attempts to send it
-/// to all provided addresses via TCP connections.
+/// into a payload, and attempts to send it to all provided addresses via the transport.
 ///
 /// # Parameters
 ///
 /// * `addresses` - A slice of `String`s representing the target addresses to which the
 ///   message should be sent.
 /// * `envelope` - A reference to the `Envelope` object that contains the message payload.
-/// * `pool` - A reference to the shared `ConnectionPool` that manages active TCP connections.
+/// * `pool` - A reference to the shared `ConnectionPool<T>` that manages active connections.
 ///
 /// # Returns
 ///
@@ -107,44 +109,37 @@ pub fn parse_envelope(line: &str) -> Result<Envelope, Box<dyn std::error::Error 
 ///
 /// - If the `envelope` cannot be serialized into JSON (`serde_json::to_vec` failure), the function
 ///   immediately returns an error.
-/// - If a TCP connection attempt fails, an error is logged, but the execution continues for other addresses.
-/// - If a write operation to a stream fails, the respective connection is removed from the pool, and
+/// - If a connection attempt fails, an error is logged, but the execution continues for other addresses.
+/// - If a write operation to a transport fails, the respective connection is removed from the pool, and
 ///   the error is logged.
-///
-/// # Notes
-///
-/// - Logging errors requires configuring proper error logging (e.g., using `log` crate).
-/// - Careful consideration should be given to how large the `addresses` slice is, since each
-///   address creates an independent async task.
-pub async fn broadcast(
+pub async fn broadcast<T: Transport, C: Connector<T = T>>(
     addresses: &[String],
     envelope: &Envelope,
-    pool: &ConnectionPool,
+    pool: &ConnectionPool<T>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let payload = serde_json::to_vec(envelope)?;
-    let mut framed = payload;
-    framed.push(b'\n');
+    let payload = Bytes::from(serde_json::to_vec(envelope)?);
 
     let mut tasks = Vec::new();
 
     for addr in addresses {
         let addr = addr.clone();
         let pool = pool.clone();
-        let framed = framed.clone();
+        let payload = payload.clone();
 
         tasks.push(tokio::spawn(async move {
             // Check pool without holding lock during connect
-            let stream_arc = pool.lock().await.get(&addr).cloned();
+            let transport_arc = pool.lock().await.get(&addr).cloned();
 
-            let stream_arc = if let Some(s) = stream_arc {
-                s
+            let transport_arc = if let Some(t) = transport_arc {
+                t
             } else {
-                match TcpStream::connect(&addr).await {
-                    Ok(stream) => {
-                        let s = Arc::new(Mutex::new(stream));
+                let connector = C::default();
+                match connector.connect(&addr).await {
+                    Ok(transport) => {
+                        let t = Arc::new(Mutex::new(transport));
                         let mut guard = pool.lock().await;
                         // Use entry so a racing task's connection wins
-                        guard.entry(addr.clone()).or_insert(s).clone()
+                        guard.entry(addr.clone()).or_insert(t).clone()
                     }
                     Err(e) => {
                         error!("failed to connect to {}: {}", addr, e);
@@ -153,8 +148,8 @@ pub async fn broadcast(
                 }
             };
 
-            let mut stream = stream_arc.lock().await;
-            if let Err(e) = stream.write_all(&framed).await {
+            let mut transport = transport_arc.lock().await;
+            if let Err(e) = transport.send(payload).await {
                 error!("failed to write to {}: {}", addr, e);
                 pool.lock().await.remove(&addr);
             }
@@ -172,9 +167,10 @@ pub async fn broadcast(
 mod tests {
     use super::*;
     use crate::transport::connection_pool::new_connection_pool;
+    use crate::transport::tcp::{TcpTransport, TcpConnector};
     use crate::types::{TxRole, WireMessage};
     use tokio::{
-        io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+        io::{AsyncWriteExt, BufReader, AsyncBufReadExt, AsyncReadExt},
         net::{TcpListener, TcpStream},
         sync::mpsc,
         time::{timeout, Duration},
@@ -240,17 +236,19 @@ mod tests {
             },
         };
 
-        let payload = format!("{}\n", serde_json::to_string(&expected).unwrap());
+        let payload = serde_json::to_vec(&expected).unwrap();
 
         let client_task = tokio::spawn(async move {
             let mut stream = TcpStream::connect(addr).await.unwrap();
-            stream.write_all(payload.as_bytes()).await.unwrap();
+            let len = payload.len() as u32;
+            stream.write_u32(len).await.unwrap();
+            stream.write_all(&payload).await.unwrap();
         });
 
         let (socket, peer_addr) = listener.accept().await.unwrap();
 
         let server_task = tokio::spawn(async move {
-            handle_connection(socket, peer_addr.to_string(), event_tx)
+            handle_connection(TcpTransport::new(socket), peer_addr.to_string(), event_tx)
                 .await
                 .unwrap();
         });
@@ -288,14 +286,15 @@ mod tests {
 
         let server_task = tokio::spawn(async move {
             let (socket, _) = listener.accept().await.unwrap();
-            let mut reader = BufReader::new(socket);
-            let mut line = String::new();
-            reader.read_line(&mut line).await.unwrap();
-            line
+            let mut reader = socket;
+            let len = reader.read_u32().await.unwrap() as usize;
+            let mut buf = vec![0u8; len];
+            reader.read_exact(&mut buf).await.unwrap();
+            String::from_utf8(buf).unwrap()
         });
 
-        let pool = new_connection_pool();
-        broadcast(&[addr.to_string()], &envelope, &pool).await.unwrap();
+        let pool = new_connection_pool::<TcpTransport>();
+        broadcast::<TcpTransport, TcpConnector>(&[addr.to_string()], &envelope, &pool).await.unwrap();
 
         let line = server_task.await.unwrap();
         let parsed: Envelope = serde_json::from_str(line.trim()).unwrap();
@@ -312,7 +311,7 @@ mod tests {
 
         let server_task = tokio::spawn(async move {
             let (socket, peer_addr) = listener.accept().await.unwrap();
-            handle_connection(socket, peer_addr.to_string(), event_tx)
+            handle_connection(TcpTransport::new(socket), peer_addr.to_string(), event_tx)
                 .await
                 .unwrap();
         });
@@ -327,8 +326,8 @@ mod tests {
             },
         };
 
-        let pool = new_connection_pool();
-        broadcast(&[addr.to_string()], &expected, &pool).await.unwrap();
+        let pool = new_connection_pool::<TcpTransport>();
+        broadcast::<TcpTransport, TcpConnector>(&[addr.to_string()], &expected, &pool).await.unwrap();
 
         let event = timeout(Duration::from_secs(1), event_rx.recv())
             .await

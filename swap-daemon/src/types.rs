@@ -4,6 +4,7 @@ use tokio::task::AbortHandle;
 use secp256k1::{PublicKey, SecretKey};
 
 use crate::transport::connection_pool::ConnectionPool;
+use crate::transport::tcp::TcpTransport;
 
 /// Enumeration representing various types of wire messages used for communication.
 ///
@@ -396,8 +397,8 @@ pub struct Participant {
 ///
 /// ## Connection Pool
 ///
-/// - **connection_pool**: `ConnectionPool`
-///   Persistent TCP connections to peers, reused across all broadcasts to prevent exhaustion of OS ephemeral ports
+/// - **connection_pool**: `ConnectionPool<TcpTransport>`
+///   Persistent connections to peers, reused across all broadcasts to prevent exhaustion of OS ephemeral ports
 ///   under high message volume.
 ///
 #[derive(Debug)]
@@ -438,9 +439,9 @@ pub struct SwapSession {
     /// Each participant provides their own collateral UTXO, used for both spend and refund txs.
     pub cardano_collaterals: HashMap<ParticipantId, CardanoCollateral>,
 
-    /// Persistent TCP connections to peers — reused across all broadcasts to avoid
+    /// Persistent connections to peers — reused across all broadcasts to avoid
     /// exhausting OS ephemeral ports under high message volume.
-    pub connection_pool: ConnectionPool,
+    pub connection_pool: ConnectionPool<TcpTransport>,
 }
 
 /// Enum representing the various targets for polling the blockchain state in a multi-party transaction protocol.

@@ -5,6 +5,7 @@ use crate::blockchains::bitcoin_utils::{bitcoin_pubkeys, compute_sighash, submit
 use crate::blockchains::{bitcoin_utils, cardano_utils};
 use crate::blockchains::cardano_utils::submit_cardano_tx;
 use crate::networking::broadcast;
+use crate::transport::tcp::{TcpTransport, TcpConnector};
 use crate::types::{
     Blockchain, DaemonConfig, Envelope, MusigRuntime, SwapKeys, SwapSession, TxRole, WireMessage,
 };
@@ -143,7 +144,7 @@ pub async fn begin_refund_signing(session: &mut SwapSession, keys: &SwapKeys) {
                 nonce: our_nonce_str,
             },
         );
-        if let Err(e) = broadcast(&addresses, &envelope, &session.connection_pool).await {
+        if let Err(e) = broadcast::<TcpTransport, TcpConnector>(&addresses, &envelope, &session.connection_pool).await {
             error!("broadcast nonce failed for role {:?}: {e}", role);
         }
     }

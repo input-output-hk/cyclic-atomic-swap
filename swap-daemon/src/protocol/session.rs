@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use rand::RngCore;
 use tracing::{error, info};
 use crate::{
+    transport::tcp::{TcpTransport, TcpConnector},
     cryptography::multisig::{adapt_role, finalize_role, transition_to_round_two},
     networking::broadcast,
     transport::connection_pool::new_connection_pool,
@@ -104,7 +105,7 @@ impl SwapSession {
             adaptor_secrets,
 
             cardano_collaterals: HashMap::new(),
-            connection_pool: new_connection_pool(),
+            connection_pool: new_connection_pool::<TcpTransport>(),
         }
     }
 
@@ -355,7 +356,7 @@ impl SwapSession {
                         let addresses = get_other_addresses(&self.participants);
                         let envelope = Envelope::new(self.id, my_id, WireMessage::SpendTxBroadcast);
 
-                        if let Err(e) = broadcast(&addresses, &envelope, &self.connection_pool).await {
+                        if let Err(e) = broadcast::<TcpTransport, TcpConnector>(&addresses, &envelope, &self.connection_pool).await {
                             error!("spend tx broadcast notification failed: {e}");
                         }
 

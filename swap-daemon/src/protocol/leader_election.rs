@@ -1,5 +1,6 @@
 use crate::{
     networking::broadcast,
+    transport::tcp::{TcpTransport, TcpConnector},
     types::{Envelope, ParticipantId, SwapSession, WireMessage},
     utils::{get_my_id, get_other_addresses},
 };
@@ -41,7 +42,7 @@ pub async fn start_leader_election(session: &mut SwapSession) {
     let addresses = get_other_addresses(&session.participants);
     let envelope = Envelope::new(session.id, my_id, WireMessage::LeaderElectionCommitment(commitment));
 
-    if let Err(e) = broadcast(&addresses, &envelope, &session.connection_pool).await {
+    if let Err(e) = broadcast::<TcpTransport, TcpConnector>(&addresses, &envelope, &session.connection_pool).await {
         error!("broadcast failed: {e}");
     }
 }
@@ -99,7 +100,7 @@ pub async fn broadcast_leader_nonce(session: &SwapSession, nonce: [u8; 32]) {
         wire_message,
     );
 
-    if let Err(e) = broadcast(&addresses, &envelope, &session.connection_pool).await {
+    if let Err(e) = broadcast::<TcpTransport, TcpConnector>(&addresses, &envelope, &session.connection_pool).await {
         error!("broadcast failed: {e}");
     }
 }

@@ -1,5 +1,6 @@
 use crate::{
     networking::{broadcast, handle_connection},
+    transport::tcp::{TcpTransport, TcpConnector},
     protocol::{
         adaptor_nonce::broadcast_adaptor_point,
         chain_monitor::{check_leader_spend_confirmed, check_lock_tx_confirmed, check_refund_window_open, validate_funding_utxos},
@@ -382,7 +383,7 @@ impl Daemon {
                                             my_id,
                                             WireMessage::SecretReveal(my_secret),
                                         );
-                                        if let Err(e) = broadcast(&addresses, &envelope, &session.connection_pool).await {
+                                        if let Err(e) = broadcast::<TcpTransport, TcpConnector>(&addresses, &envelope, &session.connection_pool).await {
                                             error!("secret reveal broadcast failed: {e}");
                                         }
                                         // spawn poller for leader's spend tx now that we're watching
@@ -479,7 +480,7 @@ impl Daemon {
                     Ok((socket, addr)) => {
                         let tx = accept_event_tx.clone();
                         tokio::spawn(async move {
-                            if let Err(e) = handle_connection(socket, addr.to_string(), tx).await {
+                            if let Err(e) = handle_connection(TcpTransport::new(socket), addr.to_string(), tx).await {
                                 error!("Connection handler error for {}: {}", addr, e);
                             }
                         });
@@ -537,7 +538,7 @@ impl Daemon {
                     Ok((socket, addr)) => {
                         let tx = accept_event_tx.clone();
                         tokio::spawn(async move {
-                            if let Err(e) = handle_connection(socket, addr.to_string(), tx).await {
+                            if let Err(e) = handle_connection(TcpTransport::new(socket), addr.to_string(), tx).await {
                                 error!("Connection handler error for {}: {}", addr, e);
                             }
                         });

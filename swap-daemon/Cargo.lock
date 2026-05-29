@@ -2935,6 +2935,7 @@ dependencies = [
  "bitcoin",
  "blake2",
  "blockfrost",
+ "bytes",
  "cardano-serialization-lib",
  "ed25519-dalek",
  "hex",
