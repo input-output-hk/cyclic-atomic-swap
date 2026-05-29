@@ -4,7 +4,8 @@ use rand::RngCore;
 use tracing::{error, info};
 use crate::{
     cryptography::multisig::{adapt_role, finalize_role, transition_to_round_two},
-    networking::{broadcast, new_connection_pool},
+    networking::broadcast,
+    transport::connection_pool::new_connection_pool,
     protocol::{
         leader_election::{
             self, broadcast_leader_nonce, compute_leader, received_leader_commitment,

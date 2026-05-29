@@ -3,7 +3,7 @@ use tokio::task::AbortHandle;
 
 use secp256k1::{PublicKey, SecretKey};
 
-use crate::networking::ConnectionPool;
+use crate::transport::connection_pool::ConnectionPool;
 
 /// Enumeration representing various types of wire messages used for communication.
 ///

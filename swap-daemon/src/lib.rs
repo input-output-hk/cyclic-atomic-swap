@@ -37,6 +37,7 @@ pub mod config;
 pub mod cryptography;
 pub mod daemon;
 pub mod networking;
+pub mod transport;
 pub mod protocol;
 pub mod test_utils;
 pub mod types;
