@@ -1,5 +1,6 @@
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream;
+use super::Transport;
 
 pub struct TcpTransport<S = TcpStream> {
     stream: S
@@ -12,8 +13,13 @@ where
     pub fn new(stream: S) -> Self {
         Self { stream }
     }
-    
-    pub async fn send(&mut self, src: &[u8]) -> tokio::io::Result<()> {
-        self.stream.write_all(src).await
+}
+
+impl<S> Transport for TcpTransport<S>
+where
+    S: AsyncWrite + Unpin + Send,
+{
+    fn send<'a>(&'a mut self, src: &'a [u8]) -> impl Future<Output = tokio::io::Result<()>> + Send + 'a {
+        self.stream.write_all(src)
     }
 }

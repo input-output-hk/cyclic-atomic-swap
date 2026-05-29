@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::transport::connection_pool::ConnectionPool;
+use crate::transport::Transport;
 use crate::types::{DaemonEvent, Envelope};
 use serde_json;
 use tokio::{
