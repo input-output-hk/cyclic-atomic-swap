@@ -18,7 +18,7 @@ a valid enterprise boundary.
 The _daemon_ handles a swap descriptor for the party it represents and the other parties it interacts with to complete
 the swap session.
 
-- The index **i** identifies the party the daemon represents
+- The index **i** identifies the party the daemon represents;
 - The index **j** identifies the other parties the daemon interacts with.
 
 
