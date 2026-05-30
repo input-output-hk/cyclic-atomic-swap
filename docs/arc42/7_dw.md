@@ -24,26 +24,28 @@ OS or container.
 
 ```mermaid
 C4Deployment
+    title "Figure 1: Intended Use Case Deployment"
     Enterprise_Boundary(party_j, "Party j") {
         Deployment_Node(party_node_j, "Party j Node", "Container/OS") {
-            Deployment_Node(swap_daemon_node_j, "Swap Daemon", "Executable") {
-                Container(swap_daemon_j, "Swap Daemon", "artifact")
+            Deployment_Node(swap_daemon_node_j, "Swap Daemon j", "Executable") {
+                Container(swap_daemon_j, "Swap Daemon j", "artifact")
             }
         }
     }
     Deployment_Node(blockchain_node, "Blockchain Node", "Container/OS") {
         Container(blockchain_validator, "Blockchain Validator", "Smart Contract")
-        ContainerDb(blockchain, "Blockchain", "Blockchain")
+        ContainerDb(blockchain, "Blockchain", "blockchain")
         Rel(blockchain_validator, blockchain, "loaded")
     }
     Enterprise_Boundary(party_i, "Party i") {
         Deployment_Node(party_node_i, "Party i Node", "Container/OS") {
-            Deployment_Node(swap_daemon_node_i, "Swap Daemon", "Executable") {
-                Container(swap_daemon_i, "Swap Daemon", "artifact")
+            Deployment_Node(swap_daemon_node_i, "Swap Daemon i", "Executable") {
+                Container(swap_daemon_i, "Swap Daemon i", "artifact")
                 Container(dashboard_server_i, "Dashboard Server", "library")
                 Container(open_telemetry_collector, "OpenTelemetry Collector Log", "Library")
                 Container(open_telemetry_instrumentation_library_i, "Open Telemetry Instrumentation", "library")
                 Container(transport_layer_i, "Pluggable Transport Layer", "library")
+                Rel(swap_daemon_i, dashboard_server_i, "link")
                 Rel(swap_daemon_i, open_telemetry_collector, "link")
                 Rel(swap_daemon_i, open_telemetry_instrumentation_library_i, "link")
                 Rel(swap_daemon_i, transport_layer_i, "link")
@@ -71,3 +73,57 @@ C4Deployment
     BiRel(swap_daemon_j, blockchain, "Read/Write")
 ```
 
+## 7.2 Reference Implementation Demo/Test Rig
+
+The reference implementation includes a demo/test rig running all daemons in the same deployment node 
+and running two containers, one for Bitcoin and one for Cardano.
+
+The containers for Bitcoin and Cardano are published in the 
+[btc-defi-atomic-swaps-test-env](https://github.com/input-output-hk/btc-defi-atomic-swaps-test-env) repository.
+
+```mermaid
+C4Deployment
+    title "Figure 2: Reference Implementation Test/Rig"
+    Enterprise_Boundary(rig, "Demo/Test Rig") {
+        Deployment_Node(runtime, "Runtime Environment", "OS") {
+            Deployment_Node(btc-defi-atomic-swaps-test-env, "https://github.com/input-output-hk/btc-defi-atomic-swaps-test-env", "repository") {
+                Deployment_Node(bitcoin_node, "Bitcoin Node", "Container") {
+                    ContainerDb(bitcoin, "Bitcoin", "blockchain")
+                }
+                Deployment_Node(cardano_node, "Cardano Node", "Container") {
+                    ContainerDb(cardano, "Cardano", "blockchain")
+                    Container(swap_validator, "Swap Validator", "Smart Contract")
+                    Rel(swap_validator, cardano, "loaded")
+                }
+            }
+            Deployment_Node(cyclic-atomic-swap, "https://github.com/input-output-hk/cyclic-atomic-swap", "repository") {
+                Deployment_Node(daemons_executable, "swap-daemon", "executable") {
+                    Container_Boundary(party_j, "Party j") {
+                        Container(swap_daemon_j, "Swap Daemon j", "agent")
+                    }
+                    Deployment_Node(dashboard_ui_vite, "Dashboard", "Vite") {
+                        Container(dashboard_ui, "Dashboard UI", "React")
+                    }
+                    Container_Boundary(party_i, "Party i") {
+                        Container(swap_daemon_i, "Swap Daemon j", "agent")
+                        Container(dashboard_server_i, "Dashboard Server", "library")
+                        Container(open_telemetry_collector, "OpenTelemetry Collector Log", "Library")
+                        Container(open_telemetry_instrumentation_library_i, "Open Telemetry Instrumentation", "library")
+                        Container(transport_layer_i, "Pluggable Transport Layer", "library")
+                    }
+                    Rel(swap_daemon_i, dashboard_server_i, "link")
+                    Rel(swap_daemon_i, open_telemetry_collector, "link")
+                    Rel(swap_daemon_i, open_telemetry_instrumentation_library_i, "link")
+                    Rel(swap_daemon_i, transport_layer_i, "link")
+                    BiRel(swap_daemon_i, swap_daemon_j, "TCP")
+                }
+            }
+        }
+    }
+    Rel(dashboard_ui, swap_daemon_i, "REST API")
+    Rel(dashboard_ui, swap_daemon_j, "REST API")
+    BiRel(swap_daemon_i, bitcoin, "Electrs REST Port 3002")
+    BiRel(swap_daemon_j, bitcoin, "Electrs REST Port 3002")
+    BiRel(swap_daemon_i, cardano, "Dolos gRPC Port 50051/50052")
+    BiRel(swap_daemon_j, cardano, "Dolos gRPC Port 50051/50052")
+```
