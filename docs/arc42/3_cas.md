@@ -18,7 +18,7 @@ a valid enterprise boundary.
 The _daemon_ handles a swap descriptor for the party it represents and the other parties it interacts with to complete
 the swap session.
 
-- The index **i** identifies the party the daemon represents
+- The index **i** identifies the party the daemon represents;
 - The index **j** identifies the other parties the daemon interacts with.
 
 
@@ -126,11 +126,11 @@ C4Container
     Rel(swap_descriptor, swap_session, "define")
     Rel(blockchain, swap_validator, "use")
     Rel(dashboard_client_ui, dashboard_api_server, "use", "REST API")
-    BiRel(blockchain, bitcoin, "read/write", "Electrs TCP Port 3002")
-    BiRel(blockchain, cardano, "read/write", "Dolos TCP Port 50051/50052")
+    BiRel(blockchain, bitcoin, "read/write", "Electrs REST Port 3002")
+    BiRel(blockchain, cardano, "read/write", "Dolos gRPC Port 50051/50052")
     BiRel(networking, p_j_daemon, "Pluggable Transport Layer", "Network")
-    BiRel(p_j_daemon, bitcoin, "read/write", "Electrs TCP Port 3002")
-    BiRel(p_j_daemon, cardano, "read/write", "Dolos TCP Port 50051/50052")
+    BiRel(p_j_daemon, bitcoin, "read/write", "Electrs REST Port 3002")
+    BiRel(p_j_daemon, cardano, "read/write", "Dolos gRPC Port 50051/50052")
 
 
 ```
