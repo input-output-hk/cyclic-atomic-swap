@@ -260,6 +260,8 @@ and their associated proeprties and types as defined in [types.rs](../../swap-da
 The data model represents the elements, concepts, and data described so far.
 The rest of this document and the linked ones refer to the data model as shown in the diagram.
 
+See [Crossing Concepts](8_cc.md) for additional details.
+
 ```mermaid
 ---
 title: Figure 3 - Daemon Data Model - Class Diagram
