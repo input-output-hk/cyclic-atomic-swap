@@ -1,27 +1,24 @@
-I have explored the `swap-daemon/src` directory and analyzed the top-level structure, identifying key modules and their dependencies. I need to further examine the `protocol` submodules to understand their specific roles and dependencies to create a detailed Mermaid graph.
+# 8 Crosscutting Concepts
 
-I have analyzed the `swap-daemon/src` Rust source files and their dependencies.
+The notable crosscutting concepts of the reference implementation are 
 
-Key findings:
-- `lib.rs` is the central library entry point.
-- `main.rs` is the binary entry point.
-- `daemon.rs` handles the main execution loop and event orchestration.
-- `types.rs` contains the shared data structures used across the project.
-- `protocol/` submodules implement the swap protocol phases, with `session.rs` acting as the central state machine.
-- `networking.rs` handles TCP communication.
-- `blockchains/` and `cryptography/` provide specialized utilities.
+- [**Daemon**](../../swap-daemon/src/daemon.rs) orchestrating instances of
+- [**Swap Session**](../../swap-daemon/src/types.rs) 
+  implemented in the [session.rs](../../swap-daemon/src/protocol/session.rs) file;
+- **Instrumentation**, implemented with [tracing](https://docs.rs/tracing/latest/tracing/) 
+  and [tracing-subscriber](https://docs.rs/tracing-subscriber/latest/tracing-subscriber/):
+  read at the linked documentation for additional info and how to integrate and customize
+  instrumentation adapting this reference implementation to a production project.
+ 
 
-I am now ready to generate the Mermaid graph.
+## 8.1 Daemon and Swap Session
 
-### Swap Daemon Structure and Dependencies
-
-Based on the analysis of the `swap-daemon/src` Rust source files, here is a Mermaid graph visualizing the structure and dependencies of the project.
+Daemon and Swap Session concepts are the pivot of software architecture of
+this reference implementatuion of the CANS protocol.
 
 ```mermaid
 graph TD
-    subgraph Entry Points
-        Main[main.rs] --> Lib[lib.rs]
-    end
+   
 
     subgraph Orchestration
         Daemon[daemon.rs]
@@ -55,15 +52,15 @@ graph TD
         Config[config.rs]
     end
 
-    %% Dependencies
-    Lib --> Daemon
-    Lib --> Session
-    Lib --> NW
-    Lib --> CRY
-    Lib --> BC
-    Lib --> Types
-    Lib --> Utils
-    Lib --> Config
+%%    %% Dependencies
+%%    Lib --> Daemon
+%%    Lib --> Session
+%%    Lib --> NW
+%%    Lib --> CRY
+%%    Lib --> BC
+%%    Lib --> Types
+%%    Lib --> Utils
+%%    Lib --> Config
 
     Daemon --> NW
     Daemon --> Types
@@ -87,10 +84,6 @@ graph TD
 ```
 
 ### Key Components Description
-
-- **Entry Points**:
-    - `main.rs`: The binary entry point, responsible for initializing the daemon and starting swap sessions.
-    - `lib.rs`: The library entry point, exposing submodules.
 
 - **Orchestration**:
     - `daemon.rs`: Implements the `Daemon` struct, which orchestrates events, manages multiple `SwapSession` instances, handles networking connections, and spawns background tasks like chain monitoring.
