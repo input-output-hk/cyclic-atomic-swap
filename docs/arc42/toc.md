@@ -17,7 +17,7 @@ The documentation of the software architecture follows the
 6. [Runtime View](6_rtw.md)
 7. [Deployment view](7_dw.md)
 8. [Crosscutting Concepts](8_cc.md)
-9. Architecture Decisions
+9. [Architecture Decisions](9_ad.md)
 10. Quality Requirements
 11. Risks and Technical Debt
 12. Glossary
