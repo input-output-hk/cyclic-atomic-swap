@@ -19,5 +19,5 @@ The documentation of the software architecture follows the
 8. [Crosscutting Concepts](8_cc.md)
 9. Architecture Decisions
 10. Quality Requirements
-11. Risks and Technical Debt
+11. [Integration Matrix](11_im.md)
 12. Glossary
