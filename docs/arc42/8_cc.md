@@ -37,7 +37,7 @@ of this reference implementation for the CANS protocol; those address the follow
 
 ```mermaid
 ---
-title: Figure 1: Crosscutting Concepts and Responsabilities
+title: "Figure 1: Crosscutting Concepts and Responsabilities"
 ---
 graph TD
     subgraph Orchestration
@@ -101,7 +101,7 @@ See [Building Blocks View](5_bbw.md) for additional details.
 
 ```mermaid
 ---
-title: Figure 2: Daemon and Swap Session API
+title: "Figure 2: Daemon and Swap Session API"
 ---
 classDiagram
   class Daemon {
