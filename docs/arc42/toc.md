@@ -18,6 +18,6 @@ The documentation of the software architecture follows the
 7. [Deployment view](7_dw.md)
 8. [Crosscutting Concepts](8_cc.md)
 9. [Architecture Decisions](9_ad.md)
-10. Quality Requirements
-11. Risks and Technical Debt
+10. [Quality Requirements](10_qr.md)
+11. [Integration Matrix](11_im.md)
 12. Glossary
