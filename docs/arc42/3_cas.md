@@ -91,7 +91,7 @@ C4Container
     title "Figure 2: Reference Implementation Technical Context"
     System_Boundary(test_rig, "Cyclic Atomic N-Party Swap Reference Implementation Demo Rig") {
         Container(swap_descriptor, "daemon.insertSession(session: SwapSession)", "`swap-daemon`")
-        Container(swap_validator, "Swap Validator", "`swap-validator`", "Plutus Smart Contract")
+        Container(swap_validator, "Swap Validator", "`swap_validator`", "Plutus Smart Contract")
         System_Boundary(lib_i, "swap-daemon/src/lib.rs") {
             Container_Boundary(daemon, "This Party i<br/>-<br/>`swap-daemon`") {
                 System(swap_session, "Swap Session")
