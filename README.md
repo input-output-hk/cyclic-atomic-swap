@@ -18,7 +18,8 @@ It leverages adaptor signatures to facilitate secure and non-interactive swaps a
 
 ## Getting Started
 
-1. Presentation
+1. [Presentation (PDF)](docs/IOG_Cyclic_Atomic_N-Party_Swap_Protocol.pdf)
+   1. [OpenDocument Presentation](docs/IOG_Cyclic_Atomic_N-Party_Swap_Protocol.odp)
 2. [Protocol Specification](docs/protocol-spec.pdf)
 3. [Software Architecture](docs/arc42/toc.md)
 4. [Reference Implementation](swap-daemon/README.md)
@@ -40,9 +41,9 @@ See the License for the specific language governing permissions and limitations 
 
 #### Contributors
 
-- Architecture: [Luca Debiasi](luca.debiasi@iohk.io), [Andrew Sutherland](mailto:andrew.sutherland@iohk.io)
+- Architecture: [Luca Debiasi](mailto:luca.debiasi@iohk.io), [Andrew Sutherland](mailto:andrew.sutherland@iohk.io)
 - Code Development: [Edmund Judge](mailto:edmund.judge@iohk.io)
-- Formal Methods: Lucas Escot, [Mauro Jaskelioff](mauro.jaskelioff@iohk.io)
-- Scientific Research: [Lukas Aumayr](lukas.aumayr@iohk.io)
+- Formal Methods: Lucas Escot, [Mauro Jaskelioff](mailto:mauro.jaskelioff@iohk.io)
+- Scientific Research: [Lukas Aumayr](mailto:lukas.aumayr@iohk.io)
 
 
