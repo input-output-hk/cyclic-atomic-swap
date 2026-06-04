@@ -2,6 +2,8 @@
 
 ## Trustless Cross-chain Swaps via Adaptor Signatures
 
+---
+
 ## Intro
 
 This repository provides a **Rust** reference implementation for the [Cyclic Atomic N-party Swap (CANS) protocol](),
@@ -27,6 +29,18 @@ It leverages adaptor signatures to facilitate secure and non-interactive swaps a
 
 ---
 
+> ### ⚠️ Important Disclaimer & Acceptance of Risk
+>
+> **This repository contains proof-of-concept implementations** intended to evaluate the feasibility 
+> of the CANS reference implementation.
+> Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an
+> "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+> This reference implementation has not been thoroughly tested and audited and is not intended for production use. 
+> By using this code, you acknowledge and accept all associated risks, 
+> and our company disclaims any liability for damages or losses.
+> See the License for the specific language governing permissions and limitations under the License.
+---
+
 ## License
 
 Copyright 2025 Input Output Global
@@ -35,9 +49,7 @@ Licensed under the [Apache License, Version 2.0](LICENSE) (the "License").
 You may not use this repository except in compliance with the License.
 You may obtain a copy of the License at [link] http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and limitations under the License.
+---
 
 #### Contributors
 
