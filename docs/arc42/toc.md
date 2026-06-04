@@ -20,4 +20,4 @@ The documentation of the software architecture follows the
 9. [Architecture Decisions](9_ad.md)
 10. [Quality Requirements](10_qr.md)
 11. [Integration Matrix](11_im.md)
-12. [Glossary](11_glossary.md)
+12. [Glossary](12_glossary.md)
