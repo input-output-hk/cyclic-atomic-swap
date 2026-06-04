@@ -40,8 +40,8 @@ See the License for the specific language governing permissions and limitations 
 
 #### Contributors
 
-- Architecture: [Luca Debiasi](luca.debiasi@iohk.io), [Andrew Sutherland](andrew.sutherland@iohk.io)
-- Code Development: [Edmund Judge](edmund.judge@iohk.io)
+- Architecture: [Luca Debiasi](luca.debiasi@iohk.io), [Andrew Sutherland](mailto:andrew.sutherland@iohk.io)
+- Code Development: [Edmund Judge](mailto:edmund.judge@iohk.io)
 - Formal Methods: Lucas Escot, [Mauro Jaskelioff](mauro.jaskelioff@iohk.io)
 - Scientific Research: [Lukas Aumayr](lukas.aumayr@iohk.io)
 

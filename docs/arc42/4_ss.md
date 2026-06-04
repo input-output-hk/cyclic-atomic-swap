@@ -17,8 +17,11 @@
 |--------------------|------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
 | Cryptography       | [MuSig2](https://eprint.iacr.org/2020/1261) adaptor signature.                                 | [MuSig2](https://docs.rs/musig2/latest/musig2/) Rust crate.          |
 | Networking         | [Ports and Adapters](https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)) pattern. | Pluggable transport layer for network communication.                 |
+| Party modelling    | [Daemon](https://en.wikipedia.org/wiki/Daemon_(computing)) pattern.                            | [Tokio](https://tokio.rs/) asynchronous application runtime pattern. |                                                                    |
 | Protocol modelling | [Finite State Machine](https://en.wikipedia.org/wiki/Finite-state_machine) pattern.            | [Tokio](https://tokio.rs/) asynchronous application runtime pattern. |
-| Party modelling    | [Daemon]https://en.wikipedia.org/wiki/Daemon_(computing) pattern.                              | [Tokio](https://tokio.rs/) asynchronous application runtime pattern. |                                                                    |
+
+
+See [Architecture Decisions](9_ad.md) for additional details.
 
 ## 4.3 Quality Goals
 
