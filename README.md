@@ -32,7 +32,7 @@ It leverages adaptor signatures to facilitate secure and non-interactive swaps a
 
 > ### ⚠️ Important Disclaimer & Acceptance of Risk
 >
-> **This repository contains proof-of-concept implementations** intended to evaluate the feasibility 
+> **This repository contains a reference implementation** intended to evaluate the feasibility 
 > of the CANS reference implementation.
 > Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an
 > "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
