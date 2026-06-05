@@ -49,9 +49,11 @@ Licensed under the [Apache License, Version 2.0](LICENSE) (the "License").
 You may not use this repository except in compliance with the License.
 You may obtain a copy of the License at [link] http://www.apache.org/licenses/LICENSE-2.0
 
-[Code of Conduct](CODE-OF-CONDUCT.md)
-
 ---
+
+[Contributing](CONTRIBUTING.md)
+
+[Code of Conduct](CODE-OF-CONDUCT.md)
 
 #### Original Contributors
 
