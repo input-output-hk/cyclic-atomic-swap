@@ -22,6 +22,7 @@ It leverages adaptor signatures to facilitate secure and non-interactive swaps a
 
 1. [Presentation (PDF)](docs/IOG_Cyclic_Atomic_N-Party_Swap_Protocol.pdf)
    1. [OpenDocument Presentation](docs/IOG_Cyclic_Atomic_N-Party_Swap_Protocol.odp)
+   2. [WBEM Video Presentation](docs/IOG_Cyclic_Atomic_N-Party_Swap_Protocol.webm) (by Edmund Judge)
 2. [Protocol Specification](docs/protocol-spec.pdf)
 3. [Software Architecture](docs/arc42/toc.md)
 4. [Reference Implementation](swap-daemon/README.md)
