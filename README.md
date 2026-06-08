@@ -52,10 +52,6 @@ You may obtain a copy of the License at [link] http://www.apache.org/licenses/LI
 
 ---
 
-[Contributing](CONTRIBUTING.md)
-
-[Code of Conduct](CODE-OF-CONDUCT.md)
-
 #### Original Contributors
 
 - Architecture: [Luca Debiasi](mailto:luca.debiasi@iohk.io), [Andrew Sutherland](mailto:andrew.sutherland@iohk.io)
