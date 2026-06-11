@@ -81,12 +81,13 @@ The key technical achievements span cryptography, blockchain integration, softwa
 
 ```mermaid
 ---
-title: "Figure 1: Three-party cyclic swap structure (N = 3, leader = P₀)"
+title: "Figure 1: Three-party cyclic swap structure (N = 3)"
 ---
 graph TD
+    subgraph Swap Session
     P0((P<sub>0</sub><br><b>Alice</b>))
     P1((P<sub>1</sub><br><b>Bob</b>))
-    P1((P<sub>2</sub><br><b>Charlie</b>))
+    P2((P<sub>2</sub><br><b>Charlie</b>))
     L0[lock<sub>0</sub>]
     L1[lock<sub>1</sub>]
     L2[lock<sub>2</sub>]
@@ -102,6 +103,7 @@ graph TD
     L0 -.->|refund<sub>0</sub>| P0
     L1 -.->|refund<sub>1</sub>| P1
     L2 -.->|refund<sub>2</sub>| P2
+    end
 ```
 
 
