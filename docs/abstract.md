@@ -79,6 +79,32 @@ The key technical achievements span cryptography, blockchain integration, softwa
   based on execution units, transaction size, and protocol parameters, 
   a practical necessity for real-world deployment where fee markets fluctuate.
 
+```mermaid
+---
+title: "Figure 1: Three-party cyclic swap structure (N = 3, leader = P₀)"
+---
+graph TD
+    P0((P<sub>0</sub><br><b>Alice</b>))
+    P1((P<sub>1</sub><br><b>Bob</b>))
+    P1((P<sub>2</sub><br><b>Charlie</b>))
+    L0[lock<sub>0</sub>]
+    L1[lock<sub>1</sub>]
+    L2[lock<sub>2</sub>]
+ 
+    P0 -->|deposit<sup>tx</sup><sub>0→1</sub>| L0
+    P1 -->|deposit<sup>tx</sup><sub>1→2</sub>| L1
+    P2 -->|deposit<sup>tx</sup><sub>2→0</sub>| L2
+ 
+    L0 -->|spend<sup>tx</sup><sub>0→1</sub>| P1
+    L1 -->|spend<sup>tx</sup><sub>1→2</sub>| P2
+    L2 -->|spend<sup>tx</sup><sub>2→0</sub>| P0
+ 
+    L0 -.->|refund<sub>0</sub>| P0
+    L1 -.->|refund<sub>1</sub>| P1
+    L2 -.->|refund<sub>2</sub>| P2
+```
+
+
 ### Challenges Faced
 
 - **Cryptographic Heterogeneity**
