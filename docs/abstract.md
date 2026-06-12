@@ -12,7 +12,7 @@ that have flourished on programmable blockchains.
 Cardano, by contrast, provides a mature ecosystem of oracles, 
 decentralised exchanges, lending protocols, and liquid staking, but lacks Bitcoin's deep liquidity pool.
 
-The Cyclic Atomic N-party Swap (CANS) protocol, developed by Input Output Global (IOG), 
+The Cyclic Atomic N-party Swap (CANS) protocol prototype, developed by Input Output Global (IOG), 
 was conceived to bridge this gap. 
 Rather than relying on custodial bridges, wrapped tokens, or centralised intermediaries
 – all of which introduce trust assumptions and single points of failure – 
