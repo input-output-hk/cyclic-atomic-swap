@@ -67,7 +67,7 @@ title: "Figure 1: Three-party cyclic swap structure (N = 3, leader = P₀)"
 graph TD
     P0((P<sub>0</sub><br><b>leader</b>))
     P1((P<sub>1</sub>))
-    P2((C))
+    P2((P<sub>2</sub>))
     L0[lock<sub>0</sub>]
     L1[lock<sub>1</sub>]
     L2[lock<sub>2</sub>]
