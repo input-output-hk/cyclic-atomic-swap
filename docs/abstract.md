@@ -45,15 +45,18 @@ that orchestrates the complete protocol lifecycle.
 The key technical achievements span cryptography, blockchain integration, software architecture, and formal verification.
 
 - **Adaptor Signatures with MuSig2**
-  The protocol's atomicity relies on adaptor signatures, it combines the signatures of the parties in a way t
-  that is indistinguishable from any other signature in the involved blockchains and assures 
-  the fact the adaptor signature is valid only if all parties reached an irrevocable agreement.
-
+  The protocol's atomicity relies on adaptor signatures. 
+  Each party contributes a partial secret, and only their combination unlocks the aggregate signature. 
+  When the leader broadcasts their spend transaction, the aggregate secret is revealed on-chain 
+  — every other participant can extract it from the witness and use it to complete their own spend transaction. 
+  The resulting signatures are ordinary Schnorr key-path spends, 
+  indistinguishable from any other transaction on the involved blockchains.
 - **Cross-Curve Bridge via Smart Contract Validator**
-  The most significant cryptographic challenge - bridging between different cryptographic curves - 
-  is solved through the smart contracts implementing the adaptor signature logic for the blockchains 
-  not supporting them natively.
-
+  The most significant cryptographic challenge — bridging between blockchains using different elliptic curves — 
+  is solved through a Cardano smart contract that verifies secp256k1 Schnorr signatures natively. 
+  This allows Cardano UTXOs to be unlocked by the same MuSig2 signatures used on Bitcoin, 
+  without requiring Cardano's native ed25519 cryptography to understand them directly. 
+  
 - **Finite State Machine Architecture**
   The swap daemon is structured around a deterministic finite state machine (FSM) that governs the protocol lifecycle: 
   from key exchange and secret commitment, through lock transaction construction and broadcast, 
@@ -110,17 +113,20 @@ graph TD
 ### Challenges Faced
 
 - **Cryptographic Heterogeneity**
-  The most demanding challenge was reconciling Bitcoin's and Cardano cryptographic curves. 
+  The most demanding challenge was reconciling Bitcoin and Cardano's cryptographic curves. 
   The solution - embedding an adaptor signature verifier inside a Cardano smart contract - 
   required careful implementation to ensure that signature verification across curves maintained the atomicity guarantee.
   Any error in the bridge logic could break the protocol's all-or-nothing property
 
 - **Time Coordination**
-  Staggering refund time-locks across N participants on heterogeneous chains - 
-  each with different block times and slot durations - required careful calibration. 
-  The refund windows must be ordered such that the last participant in the cycle can always refund before earlier 
-  participants, preventing a scenario where one party claims funds while another's refund window has already expired.
-
+  Staggering refund time-locks across N participants on heterogeneous chains
+  — each with different block times and slot durations — 
+  required careful calibration. 
+  The windows are ordered so that each party can refund before the participant they are claiming from
+  — ensuring a claim target cannot lock out their claimer by refunding first. 
+  The leader has the latest window of all, creating economic pressure to broadcast spend transaction promptly 
+  before the earliest window opens. 
+  
 - **Asynchronous Protocol Coordination**
   With N independent daemons communicating over TCP, handling network partitions, message ordering, 
   and partial failures added significant engineering complexity. 
