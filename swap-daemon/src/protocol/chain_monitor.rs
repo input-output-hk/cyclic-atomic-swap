@@ -1222,7 +1222,7 @@ mod tests {
         let result = check_cardano_confirmed_blockfrost_by_txid(
             CARDANO_KNOWN_CONFIRMED_TXID,
             "https://cardano-preprod.blockfrost.io",
-            "preprodKBMK3jjlnByABL4ErKXN0NRszeAeffvj",
+            &std::env::var("BLOCKFROST_API_KEY").expect("BLOCKFROST_API_KEY env var required for preprod tests"),
         )
         .await;
 
@@ -1240,7 +1240,7 @@ mod tests {
         let result = check_cardano_confirmed_blockfrost_by_txid(
             "0000000000000000000000000000000000000000000000000000000000000000",
             "https://cardano-preprod.blockfrost.io",
-            "preprodKBMK3jjlnByABL4ErKXN0NRszeAeffvj",
+            &std::env::var("BLOCKFROST_API_KEY").expect("BLOCKFROST_API_KEY env var required for preprod tests"),
         )
         .await;
 

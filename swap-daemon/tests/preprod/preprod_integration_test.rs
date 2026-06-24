@@ -132,7 +132,9 @@ const P4_TCP_ADDR: &str = "127.0.0.1:9704";
 const P1_BTC_LOCK_FEE: u64 = 10_000;
 const P3_BTC_LOCK_FEE: u64 = 10_000;
 
-const BLOCKFROST_API_KEY: &str      = "preprodKBMK3jjlnByABL4ErKXN0NRszeAeffvj";
+fn blockfrost_api_key() -> String {
+    std::env::var("BLOCKFROST_API_KEY").expect("BLOCKFROST_API_KEY env var required for preprod tests")
+}
 const BLOCKFROST_PREPROD_URL: &str  = "https://cardano-preprod.blockfrost.io/api/v0";
 const MEMPOOL_TESTNET4_URL: &str    = "https://mempool.space/testnet4/api";
 
@@ -256,7 +258,7 @@ async fn fetch_ada_utxo(address: &str, smallest: bool) -> AdaUtxo {
     let client = reqwest::Client::new();
     let utxos: serde_json::Value = client
         .get(&url)
-        .header("project_id", BLOCKFROST_API_KEY)
+        .header("project_id", blockfrost_api_key())
         .send()
         .await
         .unwrap()
@@ -321,7 +323,7 @@ async fn ada_has_funds(address: &str) -> bool {
     let url = format!("{BLOCKFROST_PREPROD_URL}/addresses/{address}/utxos");
     let client = reqwest::Client::new();
     for attempt in 1..=3 {
-        match client.get(&url).header("project_id", BLOCKFROST_API_KEY).send().await {
+        match client.get(&url).header("project_id", blockfrost_api_key()).send().await {
             Ok(r) if r.status().is_success() => {
                 if let Ok(v) = r.json::<serde_json::Value>().await {
                     return v.as_array().map(|a| !a.is_empty()).unwrap_or(false);
@@ -504,7 +506,7 @@ fn make_config(tcp_address: &str) -> DaemonConfig {
         tcp_address: tcp_address.to_string(),
         bitcoin_network: BitcoinNetwork::Testnet4,
         cardano_network: CardanoNetwork::Preprod,
-        blockfrost_api_key: BLOCKFROST_API_KEY.to_string(),
+        blockfrost_api_key: blockfrost_api_key().to_string(),
         validate_utxos: true,
     }
 }
@@ -552,7 +554,7 @@ async fn check_cardano_confirmed_blockfrost(txid: &str) -> bool {
     let url = format!("{BLOCKFROST_PREPROD_URL}/txs/{txid}");
     let client = reqwest::Client::new();
     matches!(
-        client.get(&url).header("project_id", BLOCKFROST_API_KEY).send().await,
+        client.get(&url).header("project_id", blockfrost_api_key()).send().await,
         Ok(r) if r.status().is_success()
     )
 }

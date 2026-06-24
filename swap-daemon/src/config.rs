@@ -42,7 +42,7 @@ impl DaemonConfig {
     /// - `tcp_address`: The provided TCP address.
     /// - `bitcoin_network`: Set to the `BitcoinNetwork::Testnet4`.
     /// - `cardano_network`: Set to the `CardanoNetwork::Preprod`.
-    /// - `blockfrost_api_key`: A preconfigured API key for accessing the Blockfrost API in the Preprod environment.
+    /// - `blockfrost_api_key`: The API key for accessing the Blockfrost API in the Preprod environment.
     /// - `validate_utxos`: Enabled (`true`) to validate UTXOs.
     ///
     pub fn testnet(tcp_address: String) -> Self {
@@ -50,7 +50,7 @@ impl DaemonConfig {
             tcp_address,
             bitcoin_network: BitcoinNetwork::Testnet4,
             cardano_network: CardanoNetwork::Preprod,
-            blockfrost_api_key: "preprodKBMK3jjlnByABL4ErKXN0NRszeAeffvj".to_string(),
+            blockfrost_api_key: std::env::var("BLOCKFROST_API_KEY").unwrap_or_default(),
             validate_utxos: true,
         }
     }

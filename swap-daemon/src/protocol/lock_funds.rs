@@ -204,7 +204,7 @@ mod tests {
             tcp_address: "127.0.0.1:9000".to_string(),
             bitcoin_network: BitcoinNetwork::Testnet4,
             cardano_network: CardanoNetwork::Preprod,
-            blockfrost_api_key: "preprodKBMK3jjlnByABL4ErKXN0NRszeAeffvj".to_string(),
+            blockfrost_api_key: "".to_string(),
             validate_utxos: false,
         }
     }
