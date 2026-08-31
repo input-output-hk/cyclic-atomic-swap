@@ -11,7 +11,7 @@ inductively under Apalache (and bounded-explicit under TLC), see
 ## Layout
 
 ```
-spec/
+formal-methods/
   protocolFlat.qnt           # the canonical verification model
   parameters.qnt             # PARTIES, LEADER, HONEST, WINDOWS, DELTA, MAX_REORGS
   types.qnt                  # Party, Phase, AssetStatus
@@ -39,16 +39,16 @@ Runs:
 
 | profile | `HONEST` | what is checked |
 |---|---|---|
-| `all_honest` | `PARTIES` | `invAtomicity` + `invHonestNoLoss` + `claimLiveness` + `refundLiveness` |
-| `no_C` | `Set("A","B")` | `invHonestNoLoss` + `claimLiveness` + `refundLiveness` |
-| `no_B` | `Set("A","C")` | `invHonestNoLoss` + `claimLiveness` + `refundLiveness` |
-| `dishonest_leader` | `PARTIES.exclude(Set(LEADER))` | `invHonestNoLoss` + `claimLiveness` + `refundLiveness` |
-| `only_A` | `Set("A")` | `invHonestNoLoss` + `claimLiveness` + `refundLiveness` |
-| `only_B` | `Set("B")` | `invHonestNoLoss` + `claimLiveness` + `refundLiveness` |
-| `only_C` | `Set("C")` | `invHonestNoLoss` + `claimLiveness` + `refundLiveness` |
+| `all_honest` | `PARTIES` | `invAtomicity` + `invHonestNoLoss` + `atomicOutcome` |
+| `no_C` | `Set("A","B")` | `invHonestNoLoss` + `atomicOutcome` |
+| `no_B` | `Set("A","C")` | `invHonestNoLoss` + `atomicOutcome` |
+| `dishonest_leader` | `PARTIES.exclude(Set(LEADER))` | `invHonestNoLoss` + `atomicOutcome` |
+| `only_A` | `Set("A")` | `invHonestNoLoss` + `atomicOutcome` |
+| `only_B` | `Set("B")` | `invHonestNoLoss` + `atomicOutcome` |
+| `only_C` | `Set("C")` | `invHonestNoLoss` + `atomicOutcome` |
 
-Wall-clock: ~10 minutes total.  Each `invHonestNoLoss` / `invAtomicity`
-job is ~12 s under Apalache; each `*Liveness` job is ~3 s under TLC.
+Wall-clock: ~5 minutes total.  Each `invHonestNoLoss` / `invAtomicity`
+job is ~30 s under Apalache; each `atomicOutcome` job is ~10 s under TLC.
 
 The script writes one TSV row per check to `results/summary.tsv` and
 prints a Markdown-style summary table at the end.  Exits 0 if every
@@ -79,8 +79,10 @@ quint verify --inductive-invariant=invHonestNoLossInductive --invariant=invHones
 quint verify --inductive-invariant=invAtomicityInductive    --invariant=invAtomicity    protocolFlat.qnt
 
 # Liveness (TLC, bounded explicit-state):
-quint verify --backend=tlc --temporal=claimLiveness  --max-steps=25 protocolFlat.qnt
-quint verify --backend=tlc --temporal=refundLiveness --max-steps=25 protocolFlat.qnt
+quint verify --backend=tlc --temporal=atomicOutcome --max-steps=25 protocolFlat.qnt
+
+# Weaker settled-liveness variant, kept for debugging when atomicOutcome fails:
+quint verify --backend=tlc --temporal=honestSettled --max-steps=25 protocolFlat.qnt
 
 # Simulation:
 quint run --invariant=invHonestNoLoss --max-steps=200 --max-samples=300 protocolFlat.qnt
@@ -120,8 +122,12 @@ backup is the safe source of truth.
 |---|---|---|---|
 | `invAtomicity` | no claim and refund coexist | Apalache | inductive (unbounded) |
 | `invHonestNoLoss` | every honest party recovers either deposit or claim | Apalache | inductive (unbounded) |
-| `claimLiveness` | post-trigger, every honest non-leader's incoming leaves Locked | TLC | temporal (BMC, ≤25 steps) |
-| `refundLiveness` | if no trigger, every honest party reaches a safe terminal asset state | TLC | temporal (BMC, ≤25 steps) |
+| `atomicOutcome` | every honest party eventually stabilises in an atomic-correct shape: swap completed for them, refunded, or never locked | TLC | temporal (BMC, ≤25 steps) |
+| `honestSettled` | every honest party's deposit eventually leaves Locked for good | TLC | temporal (BMC, ≤25 steps) |
+
+`atomicOutcome` strictly subsumes `honestSettled`, so the scripts run
+only the former; `honestSettled` is kept in the model for ad-hoc
+debugging when `atomicOutcome` fails.
 
 Atomicity is meaningful only for `HONEST = PARTIES`; with any
 adversary, that adversary can refund unilaterally while honest parties

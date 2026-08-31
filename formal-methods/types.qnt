@@ -1,11 +1,10 @@
 // -*- mode: Bluespec; -*-
 //
 // Type definitions for the cyclic atomic swap protocol.
-// See doc/protocol-spec.pdf for the full protocol description.
+// See ../docs/protocol-spec.pdf for the full protocol description.
 //
 // Trimmed to just the types the abstract model (`protocolFlat.qnt`) actually
-// consumes.  The full type set (concrete messages, network, ProtocolSystem
-// snapshot record, per-party crypto state) lives in old-spec/types.qnt.
+// consumes.
 
 module types {
 

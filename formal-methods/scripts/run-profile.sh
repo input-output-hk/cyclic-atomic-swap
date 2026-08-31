@@ -20,7 +20,7 @@ PROFILE="$1"
 HONEST_EXPR="$2"
 
 # Locate the spec directory (parent of scripts/) so this script works
-# whether invoked from spec/, scripts/, or elsewhere.
+# whether invoked from formal-methods/, scripts/, or elsewhere.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SPEC_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$SPEC_DIR"
