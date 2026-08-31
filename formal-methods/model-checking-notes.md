@@ -64,7 +64,7 @@ val INVTRANSFERS: Party -> Party = Map("A" -> "C", "B" -> "A", "C" -> "B")
 and liveness theorem discharged below holds for `N = 3` only; the
 proof says nothing directly about `N = 4` or `N = 100`.
 
-The prose spec's §10 worked example ("Example Trace: $N = 3$, Leader
+The prose spec's §11 worked example ("Example Trace: $N = 3$, Leader
 = $A$") is the same instantiation, so the formalization corresponds
 exactly to the spec's worked case.  Spec-level arguments about how
 the staggered-window invariant and the trigger cascade generalise to
@@ -114,7 +114,7 @@ when stress-testing the conservativity of Δ.
 ### A3.  Finite secret space (`SECRETS = 1.to(2)`)
 
 Spec adaptor secrets $t_i$ are drawn uniformly at random from the
-scalar field (§3.1).  The formalization:
+scalar field (§4).  The formalization:
 
 ```quint
 val SECRETS: Set[int] = 1.to(2)
@@ -131,7 +131,7 @@ and the bound is visible in the model.
 
 ### B1.  No off-chain message content; per-recipient inboxes record sender identity only
 
-The prose spec §4–§6 defines structured off-chain messages — Round-1
+The prose spec (§5, §7.1) defines structured off-chain messages — Round-1
 `Key1Resp(X_j)`, Round-2 `Key2Resp(R_j)`, Round-3
 `Key3Req(Tagg)`/`Key3Resp(s'_j)`, Round-4
 `SignInTxReq(dep_i, ref_i, W_i)`/`SignInTxResp(sig)`, secret reveal —
@@ -187,7 +187,7 @@ formalization, all such checks succeed by construction:
   `Party -> Set[Party]` blackboards recording *which depositors a
   signer has signed for*.
 
-This is consistent with the spec's own scope statement (§12,
+This is consistent with the spec's own scope statement (§13,
 "Cryptographic soundness: the adaptor signature scheme, the MuSig2
 multi-signature scheme, and their combination are assumed correct
 and secure").
@@ -314,7 +314,7 @@ reachable states the spec admits.
 
 ### B7.  `t_agg` value abstracted to a boolean
 
-The spec's trigger (§6.1) is the leader's withdraw transaction
+The spec's trigger (§7.1) is the leader's withdraw transaction
 revealing $t_{agg}$ on-chain.  The formalization tracks only whether
 the trigger has fired:
 
@@ -561,7 +561,7 @@ The three disjuncts:
 `honestSettled` forbids only "stuck `Locked` forever"; it admits
 asymmetric outcomes where, say, $p$'s deposit goes to the next party
 but $p$'s own claim is lost.  `atomicOutcome` rules those out.  The
-spec's §10 ("Partial claim") acknowledges that adversarial timing
+spec's §9 ("Partial claim") acknowledges that adversarial timing
 *can* produce asymmetric outcomes against parties that don't fulfil
 their liveness obligation; the stutter-style time progression (C1)
 is what closes the claim-versus-refund race in the abstract model
@@ -589,7 +589,7 @@ Discharges across all seven non-empty `HONEST` profiles when
 
 ### Why `MAX_REORGS = 1`
 
-See [A2](#a2-bounded-reorg-model-max_reorgs--1) for the protocol
+See [A2](#a2--bounded-reorg-model-max_reorgs--1) for the protocol
 argument: one reorg is what exercises the
 secret-survives-reorg behaviour the spec's choice of Δ is designed
 to absorb, and a second reorg adds nothing adversarially because the
@@ -621,8 +621,6 @@ spec's §2.4 finality assumption holding.
   simulates; `quint verify --inductive-invariant=…` discharges safety;
   `quint verify --backend=tlc --temporal=…` discharges liveness.
 - `types.qnt`, `parameters.qnt` — types and protocol constants.
-- `old-spec/` — frozen earlier model (`protocol.qnt`,
-  `transitions.qnt`, `queries.qnt`, `crypto.qnt`) plus its own
-  matching `types.qnt`/`parameters.qnt`.  Kept as a reference for the
-  message-level / crypto-level structure of the protocol; it does
-  *not* verify under `--inductive-invariant`.
+- `spells/` — Quint stdlib helper modules.
+- `scripts/`, `results/` — the profile-sweep automation and its
+  output (see [`README.md`](README.md)).
