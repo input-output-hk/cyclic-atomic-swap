@@ -37,6 +37,7 @@ use swap_daemon::{
         BitcoinNetwork, Blockchain, CardanoCollateral, CardanoNetwork, Daemon, DaemonConfig,
         Participant, SwapKeys, SwapSession, SwapState, TxRole,
     },
+    utils::refund_locktime_btc,
 };
 
 #[path = "../common/mod.rs"]
@@ -743,40 +744,57 @@ async fn four_party_cross_chain_refund_when_leader_absent() {
 
     // Drive refund windows in order.
     //
-    // BTC locktime = start_block + distance (refund_window_secs=60 → blocks_per_window=1).
+    // BTC locktime = start_block + distance * blocks_per_window
+    // (refund_window_secs=60 → blocks_per_window=1).
     // The daemon opens a BTC window when height >= locktime.
-    // The auto-miner confirms the lock tx at start_block + 1, opening the dist=1 window.
-    // dist=2 needs one more block, dist=3 two more.
     //
     // Structure per iteration:
-    //   1. Assert BTC at distances > dist haven't refunded (window still closed).
+    //   1. Assert no BTC participant has refunded before ITS OWN locktime.
     //   2. Wait for all participants at this distance to reach Refunded.
     //   3. Mine 1 block to open the next distance's BTC window (skip after last iteration).
     //
     // Cardano windows open by real time (distance * 60s); no extra mining needed for them.
+    //
+    // NOTE: the test does NOT control the block height. The environment's
+    // auto-mining service mines a block for every transaction it sees on ZMQ, so
+    // lock and refund broadcasts advance the chain on their own — runs have been
+    // observed ending 7 blocks ahead while the test itself mined only 3. With
+    // blocks_per_window = 1 the windows are a single block apart, so a
+    // higher-distance window can legitimately open earlier than this loop
+    // reaches it. Asserting "nobody beyond `dist` has refunded" therefore fails
+    // intermittently for a correct daemon. Instead we read the real height and
+    // assert the property that actually matters: nobody refunds before their own
+    // locktime.
     for dist in 1u32..=3 {
         // Give the daemon a moment to react to the current chain state before asserting.
         sleep(Duration::from_millis(500)).await;
 
-        // Assert BTC participants at higher distances have not yet refunded.
-        // At this point height = start_block + dist, so their locktimes are strictly in the future.
-        for &id in sorted_non_leaders.iter().filter(|&&id| {
-            participants[&id].blockchain == Blockchain::Bitcoin && distances[&id] > dist
-        }) {
-            let has_refunded = daemon_map[&id]
-                .read()
-                .await
-                .sessions
-                .get(&1)
-                .unwrap()
-                .state_history
-                .contains(&SwapState::Refunded);
-            assert!(
-                !has_refunded,
-                "P{id} (BTC, dist={}) should not have refunded before distance {} window opens",
-                distances[&id],
-                dist + 1
-            );
+        let height = bitcoin_rpc("getblockcount", serde_json::json!([]))
+            .await
+            .as_u64()
+            .unwrap() as u32;
+
+        for &id in sorted_non_leaders
+            .iter()
+            .filter(|&&id| participants[&id].blockchain == Blockchain::Bitcoin)
+        {
+            let guard = daemon_map[&id].read().await;
+            let session = guard.sessions.get(&1).unwrap();
+            let locktime = refund_locktime_btc(session, id);
+            let has_refunded = session.state_history.contains(&SwapState::Refunded);
+            drop(guard);
+
+            // Only meaningful while the window is still shut. Once height has
+            // reached the locktime, refunding is correct behaviour, whoever
+            // mined the blocks that got us there.
+            if height < locktime {
+                assert!(
+                    !has_refunded,
+                    "P{id} (BTC, dist={}) refunded before its own locktime \
+                     (locktime={locktime}, height={height})",
+                    distances[&id]
+                );
+            }
         }
 
         // Wait for every non-leader at this distance to reach Refunded.
