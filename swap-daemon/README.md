@@ -392,30 +392,76 @@ DaemonConfig {
 
 ### Start the Private Network
 
-The [btc-defi-atomic-swaps-test-env](https://github.com/input-output-hk/btc-defi-atomic-swaps-test-env) must be
-installed to provide the Bitcoin and Cardano blockchain services needed to swap among parties.
+The regression suite runs against a dockerised Bitcoin + Cardano network provided by the
+`btc-defi-atomic-swaps-test-env` repository.
 
-The `/path/to/` refers to the directory where the `btc-defi-atomic-swaps-test-env` repository is cloned.
+> **⚠️ Access note:** `input-output-hk/btc-defi-atomic-swaps-test-env` is currently an
+> **IOG-internal repository**. Without access to it the regression suite in
+> [Regression Tests](#regression-tests) cannot be run. Everything under
+> [Tests that need no private network](#tests-that-need-no-private-network) runs from this
+> repository alone. To request access, open an issue on this repository.
+
+The environment provides five containers and exposes them on fixed localhost ports, which the
+regression tests hardcode:
+
+| Service                        | Port(s)       | Used by the tests for                       |
+| ------------------------------ | ------------- | ------------------------------------------- |
+| `bitcoin-node` (regtest)       | 18443 (RPC)   | funding wallets, broadcasting, mining       |
+| `electrs` (Bitcoin indexer)    | 3002 (REST)   | UTXO and confirmation queries               |
+| `cardano-node` (private testnet) | 3001        | block production                            |
+| `dolos` (Cardano indexer)      | 50051 (REST), 50052 (gRPC) | chain tip, UTXO queries, tx submission |
+| `auto-mining`                  | —             | mining a Bitcoin block per detected tx      |
+
+Clone it and start the network:
 
 ```bash
-cd /path/to/btc-defi-atomic-swaps-test-env
+git clone git@github.com:input-output-hk/btc-defi-atomic-swaps-test-env.git
+cd btc-defi-atomic-swaps-test-env
 ./cli/testenv start
 ./cli/testenv status
+```
+
+First start takes 2–5 minutes; subsequent starts 30–45 seconds.
+
+`scripts/reg_suite.sh` needs to know where that clone lives. It defaults to a sibling directory of
+this repository (`../btc-defi-atomic-swaps-test-env`); anywhere else, set `TESTENV_DIR`:
+
+```bash
+export TESTENV_DIR=/path/to/btc-defi-atomic-swaps-test-env
 ```
 
 ---
 
 ## Running Tests
 
+### Tests that need no private network
+
+These run from a clean clone of this repository with only a Rust toolchain — no Docker, no
+credentials, no access to any other repository. The regtest and preprod tests are annotated
+`#[ignore]` unless their feature or credentials are present, so they are skipped rather than failed:
+
 ```bash
-# unit tests and non-regtest integration tests
+# 75 unit tests + the spend tx signing integration test; regression tests reported as ignored
 cargo test
 
-# spend tx signing integration test
+# spend tx signing integration test on its own
 cargo test --test spend_tx_integration_test
+```
 
+### Tests that need the private network
+
+```bash
 # all regression tests against the private network (see Regression Tests section below)
 ./scripts/reg_suite.sh
+```
+
+### Tests that need public testnet funds
+
+`tests/preprod/preprod_integration_test.rs` drives a 4-party swap over Bitcoin Testnet4 and Cardano
+Preprod. It is `#[ignore]`d because it needs pre-funded wallets and a `BLOCKFROST_API_KEY`:
+
+```bash
+BLOCKFROST_API_KEY=<key> cargo test --test preprod_integration_test -- --ignored --nocapture
 ```
 
 ### Regression Tests
@@ -430,11 +476,12 @@ The regression tests run against the private network (Bitcoin regtest + Dolos). 
 | `20_party_completed_regression_test.rs`      | 20 (BTC+ADA) | Happy path at scale: 20-participant ring, 10 BTC + 10 ADA              |
 | `refunded_regression_test.rs`                | 4 (BTC+ADA)  | Leader absent: non-leaders reclaim funds via refund txs                |
 | `failed_regression_test.rs`                  | 3 (BTC+ADA)  | Leader absent + refund txs missing: non-leaders reach Failed           |
+| `early_refund_rejection_regression_test.rs`  | 4 (BTC+ADA)  | Early refunds are rejected before the timelock: Bitcoin `nLockTime` non-finality, plus three Cardano cases — future `validity_start_interval` (phase-1 rejection), forged `lower=0`, and missing lower bound (`NegInfinity`). The last two may enter the Dolos mempool, so the assertion is that the lock UTxO remains unspent after block production. Case 2, the success path, is covered by `refunded_regression_test` |
 
 **Run a single test:**
 
 ```bash
-./cli/testenv start
+$TESTENV_DIR/cli/testenv start
 cargo test --features regtest --test completed_regression_test -- --nocapture
 ```
 
@@ -446,12 +493,18 @@ cargo test --features regtest --test completed_regression_test -- --nocapture
 
 ### Live Dashboard
 
-Each regression test includes a live visualisation dashboard showing the swap ring, per-participant state, and a real-time state transition log. `reg_suite.sh` enables it by default.
+The four swap-completing regression tests include a live visualisation dashboard showing the swap
+ring, per-participant state, and a real-time state transition log. `reg_suite.sh` enables it for
+those four; `early_refund_rejection_regression_test` runs without it.
+
+The dashboard is the [`dashboard/`](../dashboard) package **in this repository** — no other
+repository is needed. It is a Vite/React app served on port 5173 that polls the swap state the test
+process publishes on `127.0.0.1:3030` (the `dashboard` cargo feature starts that endpoint).
 
 **Terminal 1** — start the React dev server (once, leave it running):
 ```bash
-cd /path/to/btcdefi-lpqp/dashboard
-npm install  # first time only
+cd ../dashboard        # from swap-daemon/, i.e. the dashboard/ directory at the repository root
+npm install            # first time only
 npm run dev
 ```
 
@@ -459,7 +512,7 @@ npm run dev
 ```bash
 ./scripts/reg_suite.sh
 # or individually:
-./cli/testenv start
+$TESTENV_DIR/cli/testenv start
 cargo test --features "regtest,dashboard" --test completed_regression_test -- --nocapture
 ```
 

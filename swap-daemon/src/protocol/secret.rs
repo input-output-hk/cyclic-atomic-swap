@@ -289,7 +289,7 @@ async fn find_cardano_spend_txid_dolos(lock_txid: &str, rest_url: &str) -> Optio
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```text
 /// use my_crate::find_cardano_spend_txid_blockfrost;
 ///
 /// #[tokio::main]

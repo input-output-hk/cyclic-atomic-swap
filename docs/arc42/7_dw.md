@@ -81,6 +81,11 @@ and running two containers, one for Bitcoin and one for Cardano.
 The containers for Bitcoin and Cardano are published in the 
 [btc-defi-atomic-swaps-test-env](https://github.com/input-output-hk/btc-defi-atomic-swaps-test-env) repository.
 
+> **Note:** that repository is currently IOG-internal, so the link above resolves only for accounts
+> with access. The regression suite it drives is documented in
+> [swap-daemon/README.md](../../swap-daemon/README.md#regression-tests), which also lists the tests
+> that run from this repository alone. Open an issue on this repository to request access.
+
 ```mermaid
 C4Deployment
     title "Figure 2: Reference Implementation Test/Rig"

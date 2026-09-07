@@ -509,7 +509,7 @@ pub fn refund_locktime_cardano(session: &SwapSession, participant_id: Participan
 ///
 /// # Example
 ///
-/// ```rust
+/// ```text
 /// use std::collections::HashMap;
 ///
 /// #[derive(Clone)]
