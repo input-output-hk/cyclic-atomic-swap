@@ -93,12 +93,24 @@ pub async fn begin_refund_signing(session: &mut SwapSession, keys: &SwapKeys) {
                     collateral,
                 );
                 // The Plutus validator's Refund path verifies:
-                //   schnorr(agg_pubkey, blake2b(0x01 || txid), sig)
+                //   schnorr(agg_pubkey, blake2b(0x01 || lock_txid), sig)
                 // 0x01 prefix is the domain tag — prevents a refund sig from being
-                // replayed via the Spend redeemer (which signs txid with no prefix).
-                // refund_slot is already committed to by txid: the lock tx body
-                // contains the datum inline, so any change to refund_slot in the
-                // datum would produce a different txid and invalidate all signatures.
+                // replayed via the Spend redeemer (which signs the lock txid with
+                // no prefix).
+                //
+                // The datum's deadline IS committed to by lock_txid: the lock tx
+                // body carries the datum inline, so altering it changes the lock
+                // txid and invalidates every signature over this message.
+                //
+                // What is NOT committed to is this refund tx's own body. The
+                // signed message is a function of lock_txid alone, so it binds
+                // neither `validity_start_interval` nor the outputs of the tx
+                // being built here — the same signature is valid for ANY tx
+                // spending that UTxO via the Refund redeemer. (Contrast the
+                // Bitcoin arm above, where compute_sighash covers the spending tx
+                // and therefore its nLockTime.) The timelock consequently rests
+                // entirely on the validator's validity_range check plus the
+                // ledger's phase-1 enforcement, NOT on this signature.
                 let mut preimage = vec![1u8];
                 preimage.extend_from_slice(&lock_txhash.to_bytes());
                 let msg = Blake2b::<U32>::digest(&preimage).to_vec();

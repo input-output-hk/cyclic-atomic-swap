@@ -405,7 +405,7 @@ pub async fn adapt_role_with(
 /// * If the points extracted from the adaptor signature or full signature are inconsistent.
 /// * If the computed adaptor secret does not match the expected adaptor public key.
 ///
-/// ```
+/// ```text
 /// let adaptor_signature: AdaptorSignature = ...; // Construct an adaptor signature
 /// let full_signature: LiftedSignature = ...; // Construct a valid full signature
 /// let adaptor_secret = compute_adaptor_secret(adaptor_signature, full_signature);

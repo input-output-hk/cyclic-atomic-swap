@@ -23,7 +23,7 @@
 //   P4 locks ADA, claims BTC from P1's Bitcoin lock
 //
 // Prerequisites:
-//   1. ./cli/testenv start
+//   1. ../test-env/testenv start
 //   (Bitcoin UTXOs are mined automatically by the test via generatetoaddress + 101 maturity blocks)
 //
 // Run with:
@@ -405,7 +405,7 @@ async fn fetch_p2_genesis_utxo() -> GenesisUtxo {
 ///
 /// Separate collateral UTXOs are required because P2 and P4 spend txs may be
 /// submitted concurrently — sharing a collateral UTXO would cause a mempool conflict.
-async fn setup_cardano_utxos() -> FundingInfo {
+async fn setup_cardano_utxos(cardano_system_start: u64) -> FundingInfo {
     let fee: u64 = 400_000;
     let p2_verifying = hex::decode(P2_CARDANO_VERIFYING_KEY).unwrap();
     let p4_verifying = hex::decode(P4_CARDANO_VERIFYING_KEY).unwrap();
@@ -447,7 +447,7 @@ async fn setup_cardano_utxos() -> FundingInfo {
 
     let transfer_txid = cardano_txid(&signed_hex);
     info!("setup: submitting Cardano funding tx {}", transfer_txid);
-    cardano_utils::submit_cardano_tx(&signed_hex, &make_regtest_config(P1_TCP_ADDR)).await;
+    cardano_utils::submit_cardano_tx(&signed_hex, &make_regtest_config(P1_TCP_ADDR, cardano_system_start)).await;
 
     info!("setup: waiting for Cardano funding tx to confirm...");
     timeout(
@@ -591,13 +591,14 @@ fn make_collaterals(funding: &FundingInfo) -> std::collections::HashMap<u8, Card
     map
 }
 
-fn make_regtest_config(tcp_address: &str) -> DaemonConfig {
+fn make_regtest_config(tcp_address: &str, system_start_secs: u64) -> DaemonConfig {
     DaemonConfig {
         tcp_address: tcp_address.to_string(),
         bitcoin_network: BitcoinNetwork::Custom(ELECTRS_URL.to_string()),
         cardano_network: CardanoNetwork::Custom {
             grpc_url: DOLOS_GRPC_URL.to_string(),
             rest_url: DOLOS_REST_URL.to_string(),
+            system_start_secs,
         },
         blockfrost_api_key: "".to_string(),
         validate_utxos: true,
@@ -668,7 +669,8 @@ async fn wait_for_completed(daemon: &tokio::sync::RwLock<Daemon>, name: &str) {
 async fn four_party_swap_over_tcp() {
     common::init_tracing();
     info!("=== Setting up Cardano UTXOs ===");
-    let funding = setup_cardano_utxos().await;
+    let cardano_system_start = common::get_cardano_system_start(DOLOS_REST_URL).await;
+    let funding = setup_cardano_utxos(cardano_system_start).await;
     let collaterals = make_collaterals(&funding);
 
     info!("=== Setting up Bitcoin UTXOs ===");
@@ -705,22 +707,22 @@ async fn four_party_swap_over_tcp() {
     };
 
     let d1: Arc<tokio::sync::RwLock<Daemon>> = Arc::new(tokio::sync::RwLock::new({
-        let mut daemon = Daemon::new(make_p1_keys(), make_regtest_config(P1_TCP_ADDR));
+        let mut daemon = Daemon::new(make_p1_keys(), make_regtest_config(P1_TCP_ADDR, cardano_system_start));
         daemon.insert_session(make_session(1));
         daemon
     }));
     let d2: Arc<tokio::sync::RwLock<Daemon>> = Arc::new(tokio::sync::RwLock::new({
-        let mut daemon = Daemon::new(make_p2_keys(), make_regtest_config(P2_TCP_ADDR));
+        let mut daemon = Daemon::new(make_p2_keys(), make_regtest_config(P2_TCP_ADDR, cardano_system_start));
         daemon.insert_session(make_session(2));
         daemon
     }));
     let d3: Arc<tokio::sync::RwLock<Daemon>> = Arc::new(tokio::sync::RwLock::new({
-        let mut daemon = Daemon::new(make_p3_keys(), make_regtest_config(P3_TCP_ADDR));
+        let mut daemon = Daemon::new(make_p3_keys(), make_regtest_config(P3_TCP_ADDR, cardano_system_start));
         daemon.insert_session(make_session(3));
         daemon
     }));
     let d4: Arc<tokio::sync::RwLock<Daemon>> = Arc::new(tokio::sync::RwLock::new({
-        let mut daemon = Daemon::new(make_p4_keys(), make_regtest_config(P4_TCP_ADDR));
+        let mut daemon = Daemon::new(make_p4_keys(), make_regtest_config(P4_TCP_ADDR, cardano_system_start));
         daemon.insert_session(make_session(4));
         daemon
     }));

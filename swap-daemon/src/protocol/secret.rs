@@ -228,6 +228,78 @@ async fn fetch_valid_sig_cardano_dolos(txid: &str, rest_url: &str) -> Option<Vec
 /// - JSON parsing of the REST API response fails.
 /// - The expected structure of the response data is not met.
 ///
+/// Determines whether a Cardano transaction consumed the swap script UTxO using
+/// the `Refund` redeemer rather than the `Spend` redeemer.
+///
+/// `SwapRedeemer` is `Spend { .. } | Refund { .. }`, so Plutus encodes them as
+/// constructor 0 and constructor 1 respectively. Only a `Spend` carries the
+/// adapted signature the adaptor secret can be recovered from; a `Refund` spends
+/// the same UTxO but its signature is unrelated, so treating one as the other
+/// makes secret extraction fail.
+///
+/// Returns `None` when the redeemer cannot be determined (network error,
+/// unparseable tx), so callers can fall back to their existing behaviour rather
+/// than assuming either answer.
+async fn cardano_spend_used_refund_redeemer(txid: &str, rest_url: &str) -> Option<bool> {
+    use cardano_serialization_lib::Transaction;
+
+    let url = format!("{rest_url}/txs/{txid}/cbor");
+    let resp = reqwest::get(&url).await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let body: serde_json::Value = resp.json().await.ok()?;
+    let cbor_hex = body["cbor"].as_str()?;
+    let tx = Transaction::from_hex(cbor_hex).ok()?;
+    let redeemers = tx.witness_set().redeemers()?;
+
+    for i in 0..redeemers.len() {
+        let data = redeemers.get(i).data();
+        if let Some(constr) = data.as_constr_plutus_data() {
+            // Constructor 1 == SwapRedeemer::Refund
+            if constr.alternative() == cardano_serialization_lib::BigNum::one() {
+                return Some(true);
+            }
+        }
+    }
+    Some(false)
+}
+
+/// Blockfrost counterpart of [`cardano_spend_used_refund_redeemer`], for the
+/// public networks (preprod / preview / mainnet).
+async fn cardano_spend_used_refund_redeemer_blockfrost(
+    txid: &str,
+    base_url: &str,
+    api_key: &str,
+) -> Option<bool> {
+    use cardano_serialization_lib::Transaction;
+
+    let url = format!("{base_url}/api/v0/txs/{txid}/cbor");
+    let resp = reqwest::Client::new()
+        .get(&url)
+        .header("project_id", api_key)
+        .send()
+        .await
+        .ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let body: serde_json::Value = resp.json().await.ok()?;
+    let cbor_hex = body["cbor"].as_str()?;
+    let tx = Transaction::from_hex(cbor_hex).ok()?;
+    let redeemers = tx.witness_set().redeemers()?;
+
+    for i in 0..redeemers.len() {
+        let data = redeemers.get(i).data();
+        if let Some(constr) = data.as_constr_plutus_data() {
+            if constr.alternative() == cardano_serialization_lib::BigNum::one() {
+                return Some(true);
+            }
+        }
+    }
+    Some(false)
+}
+
 async fn find_cardano_spend_txid_dolos(lock_txid: &str, rest_url: &str) -> Option<String> {
     use crate::blockchains::cardano_utils::{script_address, CARDANO_TESTNET};
     let addr = script_address(CARDANO_TESTNET).to_bech32(None).unwrap();
@@ -247,6 +319,17 @@ async fn find_cardano_spend_txid_dolos(lock_txid: &str, rest_url: &str) -> Optio
         if inputs.iter().any(|i| {
             i["tx_hash"].as_str() == Some(lock_txid) && i["output_index"].as_u64() == Some(0)
         }) {
+            // The lock UTxO can equally be consumed by a refund tx. Only the
+            // leader's spend carries the adapted signature we are after, so
+            // report a refund as "no spend tx found" and let the caller take
+            // its refund-scenario path.
+            if cardano_spend_used_refund_redeemer(tx_hash, rest_url).await == Some(true) {
+                info!(
+                    "Cardano lock UTXO {lock_txid}#0 was consumed by refund tx {tx_hash} \
+                     (Refund redeemer) — not the leader's spend tx"
+                );
+                return None;
+            }
             return Some(tx_hash.to_string());
         }
     }
@@ -289,7 +372,7 @@ async fn find_cardano_spend_txid_dolos(lock_txid: &str, rest_url: &str) -> Optio
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```text
 /// use my_crate::find_cardano_spend_txid_blockfrost;
 ///
 /// #[tokio::main]
@@ -348,6 +431,17 @@ async fn find_cardano_spend_txid_blockfrost(lock_txid: &str, base_url: &str, api
         if inputs.iter().any(|i| {
             i["tx_hash"].as_str() == Some(lock_txid) && i["output_index"].as_u64() == Some(0)
         }) {
+            // See the Dolos counterpart: a refund tx consumes the same UTxO but
+            // carries no adapted signature, so report it as "no spend tx found".
+            if cardano_spend_used_refund_redeemer_blockfrost(tx_hash, base_url, api_key).await
+                == Some(true)
+            {
+                info!(
+                    "Cardano lock UTXO {lock_txid}#0 was consumed by refund tx {tx_hash} \
+                     (Refund redeemer) — not the leader's spend tx"
+                );
+                return None;
+            }
             return Some(tx_hash.to_string());
         }
     }
@@ -437,8 +531,33 @@ pub async fn extract_secret_and_adapt(
     let adaptor_sig =
         musig2::AdaptorSignature::from_bytes(&hex::decode(adaptor_sig_hex).unwrap()).unwrap();
 
-    let valid_sig = musig2::LiftedSignature::from_bytes(&valid_sig_bytes).unwrap();
-    let agg_secret = multisig::compute_adaptor_secret(adaptor_sig, valid_sig).unwrap();
+    // The bytes came off whatever transaction consumed the lock UTxO, which is
+    // not guaranteed to be the leader's adaptor spend — a refund tx also spends
+    // it and also carries a signature. Neither of the next two steps is an
+    // invariant, so neither may be unwrapped: a refund's signature simply is not
+    // an adaptor spend signature, and saying so is a normal outcome, not a bug.
+    let valid_sig = match musig2::LiftedSignature::from_bytes(&valid_sig_bytes) {
+        Ok(sig) => sig,
+        Err(e) => {
+            info!(
+                "signature on the spending tx is not a valid lifted signature ({e:?}) — \
+                 the lock UTxO was not consumed by the leader's spend tx; skipping secret extraction"
+            );
+            return false;
+        }
+    };
+
+    let agg_secret = match multisig::compute_adaptor_secret(adaptor_sig, valid_sig) {
+        Some(secret) => secret,
+        None => {
+            info!(
+                "adaptor secret does not validate against the spending tx's signature — \
+                 the lock UTxO was consumed by a refund tx rather than the leader's spend; \
+                 skipping secret extraction"
+            );
+            return false;
+        }
+    };
 
     session
         .adaptor_secrets

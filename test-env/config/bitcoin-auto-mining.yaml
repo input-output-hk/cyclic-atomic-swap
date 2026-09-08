@@ -1,0 +1,11 @@
+# Bitcoin Auto-Mining Service Configuration
+
+# Bitcoin node connection
+bitcoin:
+  # ZMQ endpoint for raw transaction notifications
+  zmq_host: bitcoin-node
+  zmq_port: 28332
+
+  # RPC endpoint for mining blocks
+  rpc_host: bitcoin-node
+  rpc_port: 18443

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use musig2::secp::Scalar;
 use secp256k1::PublicKey;
 
-use crate::types::{Address, ParticipantId, Participants, SwapSession, TxRole};
+use crate::types::{CardanoNetwork, Address, ParticipantId, Participants, SwapSession, TxRole};
 
 /// Retrieves the ID of the current participant marked as "me" from a list of participants.
 ///
@@ -476,6 +476,54 @@ pub fn refund_locktime_cardano(session: &SwapSession, participant_id: Participan
     session.start_slot + distance * session.refund_window_secs
 }
 
+/// Calculates a participant's refund deadline as POSIX time in **milliseconds**,
+/// for the `refund_posix_ms` field of the lock tx datum.
+///
+/// # Why this is not just [`refund_locktime_cardano`]
+///
+/// That function returns a **slot**, which is the correct unit for a refund tx's
+/// `validity_start_interval` (enforced by the ledger in phase 1) and for
+/// comparing against the chain tip. It is the wrong unit for the datum: the
+/// Plutus script receives `Transaction.validity_range` as POSIX milliseconds, so
+/// a datum holding a slot number makes the script's `lower >= refund_posix_ms`
+/// guard vacuous — any POSIX timestamp (~1.7e12) exceeds any plausible slot
+/// number. The timelock would then rest solely on the refund tx's self-declared
+/// `invalid_before`, which the refunding party controls: declaring
+/// `invalid_before = 0` would let them spend a locked UTxO immediately.
+///
+/// The two units are deliberately different and complementary:
+/// - phase 1 enforces `current_slot >= invalid_before` (slots)
+/// - the script enforces `invalid_before >= deadline` (POSIX ms)
+///
+/// which together prove the deadline has passed.
+///
+/// Slots are converted assuming a 1-second slot length. That holds for mainnet,
+/// preprod, preview and the dockerised private network (whose Shelley genesis
+/// sets `slotLength: 1`); it is the same assumption already baked into
+/// [`refund_locktime_cardano`], which adds a duration in seconds to a slot.
+///
+/// # Panics
+///
+/// * If `session.cardano_system_start_secs` is 0 — the network start was never
+///   read from chain data. This is deliberate: continuing would build a lock tx
+///   whose refund timelock cannot be enforced on chain.
+/// * If the session leader has not yet been elected.
+pub fn refund_deadline_posix_ms(
+    session: &SwapSession,
+    participant_id: ParticipantId,
+    network: &CardanoNetwork,
+) -> u64 {
+    let system_start_secs = network.system_start_secs();
+    assert!(
+        system_start_secs > 0,
+        "network system start is 0; a Custom network must be given its Shelley \
+         genesis `systemStart`, otherwise the refund timelock in the datum \
+         cannot be enforced on chain"
+    );
+    let refund_slot = refund_locktime_cardano(session, participant_id);
+    (system_start_secs + refund_slot) * 1_000
+}
+
 /// Calculates the distance (in terms of links) from a specified participant to the leader in a
 /// directed graph of participants.
 ///
@@ -509,7 +557,7 @@ pub fn refund_locktime_cardano(session: &SwapSession, participant_id: Participan
 ///
 /// # Example
 ///
-/// ```rust
+/// ```text
 /// use std::collections::HashMap;
 ///
 /// #[derive(Clone)]

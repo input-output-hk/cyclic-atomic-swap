@@ -38,10 +38,19 @@ use crate::types::{CardanoNetwork, DaemonConfig, Participant, SwapKeys};
 // Aiken-compiled Plutus V3 script: compiledCode from plutus.json (361 bytes).
 // Compiled with Aiken v1.1.21. Validator has two spending paths:
 //   Spend:  verifies schnorr(agg_pubkey, txid, sig)
-//   Refund: checks validity_range.lower >= datum.refund_slot, then verifies
-//           schnorr(agg_pubkey, blake2b(0x01 || txid), sig)
+//   Refund: checks validity_range.lower >= datum.refund_posix_ms, then verifies
+//           schnorr(agg_pubkey, blake2b(0x01 || lock_txid), sig)
 // The 0x01 prefix is the domain tag — prevents a refund sig from being replayed
-// via the Spend redeemer (which signs txid with no prefix) to bypass the timelock.
+// via the Spend redeemer (which signs the lock txid with no prefix).
+//
+// NOTE on units: validity_range.lower is POSIX milliseconds, so the datum's
+// deadline must be too. A slot number there makes the timelock check vacuous.
+//
+// NOTE on what the signature covers: the signed message is derived from the LOCK
+// tx's id only — it does not commit to the spending tx's body, so it constrains
+// neither the refund tx's validity interval nor its outputs. The timelock is
+// therefore enforced solely by the validity_range check above plus the ledger's
+// phase-1 rule; it is NOT protected by the co-signed signature.
 // Hash: afdc922d468f249b3bd5b3504a8f42bec5ac26a8f61a0e92543603e8
 pub const SWAP_SCRIPT_BYTES: &[u8] = &[
     0x59, 0x01, 0x66, 0x01, 0x01, 0x00, 0x29, 0x80, 0x0a, 0xba, 0x2a, 0xba, 0x1a, 0xab, 0x9f, 0xaa,
@@ -153,6 +162,7 @@ pub const CARDANO_MAINNET: u8 = 1;
 /// A constant representing the identifier for the Cardano testnet.
 pub const CARDANO_TESTNET: u8 = 0;
 
+
 /// Generates a Cardano script-based address for a given network using a Plutus V3 script.
 ///
 /// This function creates a script address by using a predefined Plutus V3 script (`SWAP_SCRIPT_BYTES`),
@@ -231,8 +241,9 @@ pub fn compute_cardano_sighash(tx: &Transaction) -> Vec<u8> {
 /// - `fee`: The amount (in lovelaces) to set aside as a fee for the transaction.
 /// - `network`: A numeric representation of the network (e.g., testnet or
 ///   mainnet) used to determine the appropriate script address.
-/// - `refund_slot`: The slot number for the refund mechanism, encoded in the
-///   transaction datum.
+/// - `refund_deadline_posix_ms`: The earliest moment the locked UTxO may be
+///   refunded, as **POSIX time in milliseconds**, encoded in the transaction
+///   datum. NOT a slot number — see the note below.
 ///
 /// # Returns
 /// A `Transaction` object representing the newly constructed transaction to
@@ -243,13 +254,15 @@ pub fn compute_cardano_sighash(tx: &Transaction) -> Vec<u8> {
 ///   does not perform validation.
 /// - Script address generation is dependent on the network parameter. Ensure
 ///   that the correct network value is provided.
-/// - The refund mechanism is implemented in the datum using the refund slot.
-///   Consumers of the transaction must understand and process the datum
-///   structure accordingly.
+/// - The refund deadline goes into the datum in POSIX milliseconds because the
+///   Plutus validator compares it against `Transaction.validity_range`, which the
+///   ledger supplies as POSIX time. Passing a slot number makes the on-chain
+///   timelock unenforceable. Use
+///   [`crate::utils::refund_deadline_posix_ms`] to derive this value.
 ///
 /// # Errors
 /// - Panics if the `funding_utxo_txhash` is not a valid hexadecimal string.
-/// - Panics if the `refund_slot` cannot be successfully parsed into a BigInt.
+/// - Panics if `refund_deadline_posix_ms` cannot be successfully parsed into a BigInt.
 ///
 /// ```
 pub fn build_lock_tx(
@@ -259,7 +272,7 @@ pub fn build_lock_tx(
     aggregate_pubkey: &musig2::secp256k1::PublicKey,
     fee: u64,
     network: u8,
-    refund_slot: u64,
+    refund_deadline_posix_ms: u64,
 ) -> Transaction {
     let mut inputs = TransactionInputs::new();
     inputs.add(&TransactionInput::new(
@@ -267,7 +280,7 @@ pub fn build_lock_tx(
         funding_utxo_index,
     ));
 
-    // datum: {aggregatePubKey}
+    // datum: {aggregate_pubkey, refund_posix_ms}
     let xonly_bytes = aggregate_pubkey.serialize()[1..].to_vec();
     error!(
         "BUILD_LOCK_TX datum pubkey (xonly): {}",
@@ -276,7 +289,8 @@ pub fn build_lock_tx(
     let mut datum_fields = PlutusList::new();
     datum_fields.add(&PlutusData::new_bytes(xonly_bytes));
     datum_fields.add(&PlutusData::new_integer(
-        &cardano_serialization_lib::BigInt::from_str(&refund_slot.to_string()).unwrap(),
+        &cardano_serialization_lib::BigInt::from_str(&refund_deadline_posix_ms.to_string())
+            .unwrap(),
     ));
 
     let datum = PlutusData::new_constr_plutus_data(
@@ -971,7 +985,7 @@ async fn evaluate_redeemer_units(config: &DaemonConfig, tx_hex: &str) -> (u64, u
 
     let result: Option<(u64, u64)> = async {
         let tx_bytes = hex::decode(tx_hex).ok()?;
-        let url = format!("{}/api/v0/utils/txs/evaluate", base_url);
+            let url = format!("{}/api/v0/utils/txs/evaluate", base_url);
         let resp = reqwest::Client::new()
             .post(&url)
             .header("project_id", api_key)
@@ -1598,7 +1612,7 @@ mod tests {
             .with_max_level(tracing::Level::DEBUG)
             .try_init();
 
-        // Aiken's plutus.json reports hash = 303f4fcf... (compiled with Aiken v1.1.21)
+        // Aiken's plutus.json reports hash = afdc922d... (compiled with Aiken v1.1.21)
         // CSL's new_v3(raw_flat_bytes) should produce the same hash
         let script = PlutusScript::new_v3(SWAP_SCRIPT_BYTES.to_vec());
         let hash = hex::encode(script.hash().to_bytes());

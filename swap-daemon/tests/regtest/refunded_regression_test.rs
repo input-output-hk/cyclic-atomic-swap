@@ -20,7 +20,7 @@
 // in the future).
 //
 // Prerequisites:
-//   ./cli/testenv start
+//   ../test-env/testenv start
 //
 // Run with:
 //   cargo test --features regtest,dashboard --test refunded_regression_test -- --nocapture
@@ -37,6 +37,7 @@ use swap_daemon::{
         BitcoinNetwork, Blockchain, CardanoCollateral, CardanoNetwork, Daemon, DaemonConfig,
         Participant, SwapKeys, SwapSession, SwapState, TxRole,
     },
+    utils::refund_locktime_btc,
 };
 
 #[path = "../common/mod.rs"]
@@ -456,13 +457,14 @@ async fn setup_cardano_utxos(config: &DaemonConfig) -> FundingInfo {
 // Config and state polling helpers
 // =============================================================================
 
-fn make_regtest_config(tcp_address: &str) -> DaemonConfig {
+fn make_regtest_config(tcp_address: &str, system_start_secs: u64) -> DaemonConfig {
     DaemonConfig {
         tcp_address: tcp_address.to_string(),
         bitcoin_network: BitcoinNetwork::Custom(ELECTRS_URL.to_string()),
         cardano_network: CardanoNetwork::Custom {
             grpc_url: DOLOS_GRPC_URL.to_string(),
             rest_url: DOLOS_REST_URL.to_string(),
+            system_start_secs,
         },
         blockfrost_api_key: "".to_string(),
         validate_utxos: false,
@@ -521,7 +523,8 @@ async fn four_party_cross_chain_refund_when_leader_absent() {
     // at a time and assert that higher-distance BTC participants have not yet
     // refunded before their window opens.
 
-    let config = make_regtest_config(P1_TCP_ADDR);
+    let cardano_system_start = common::get_cardano_system_start(DOLOS_REST_URL).await;
+    let config = make_regtest_config(P1_TCP_ADDR, cardano_system_start);
 
     info!("=== Setting up Cardano UTxOs ===");
     let funding = setup_cardano_utxos(&config).await;
@@ -643,22 +646,22 @@ async fn four_party_cross_chain_refund_when_leader_absent() {
 
     info!("=== Initializing daemons ===");
     let d1: Arc<tokio::sync::RwLock<Daemon>> = Arc::new(tokio::sync::RwLock::new({
-        let mut daemon = Daemon::new(make_p1_keys(), make_regtest_config(P1_TCP_ADDR));
+        let mut daemon = Daemon::new(make_p1_keys(), make_regtest_config(P1_TCP_ADDR, cardano_system_start));
         daemon.insert_session(make_session(1));
         daemon
     }));
     let d2: Arc<tokio::sync::RwLock<Daemon>> = Arc::new(tokio::sync::RwLock::new({
-        let mut daemon = Daemon::new(make_p2_keys(), make_regtest_config(P2_TCP_ADDR));
+        let mut daemon = Daemon::new(make_p2_keys(), make_regtest_config(P2_TCP_ADDR, cardano_system_start));
         daemon.insert_session(make_session(2));
         daemon
     }));
     let d3: Arc<tokio::sync::RwLock<Daemon>> = Arc::new(tokio::sync::RwLock::new({
-        let mut daemon = Daemon::new(make_p3_keys(), make_regtest_config(P3_TCP_ADDR));
+        let mut daemon = Daemon::new(make_p3_keys(), make_regtest_config(P3_TCP_ADDR, cardano_system_start));
         daemon.insert_session(make_session(3));
         daemon
     }));
     let d4: Arc<tokio::sync::RwLock<Daemon>> = Arc::new(tokio::sync::RwLock::new({
-        let mut daemon = Daemon::new(make_p4_keys(), make_regtest_config(P4_TCP_ADDR));
+        let mut daemon = Daemon::new(make_p4_keys(), make_regtest_config(P4_TCP_ADDR, cardano_system_start));
         daemon.insert_session(make_session(4));
         daemon
     }));
@@ -743,40 +746,57 @@ async fn four_party_cross_chain_refund_when_leader_absent() {
 
     // Drive refund windows in order.
     //
-    // BTC locktime = start_block + distance (refund_window_secs=60 → blocks_per_window=1).
+    // BTC locktime = start_block + distance * blocks_per_window
+    // (refund_window_secs=60 → blocks_per_window=1).
     // The daemon opens a BTC window when height >= locktime.
-    // The auto-miner confirms the lock tx at start_block + 1, opening the dist=1 window.
-    // dist=2 needs one more block, dist=3 two more.
     //
     // Structure per iteration:
-    //   1. Assert BTC at distances > dist haven't refunded (window still closed).
+    //   1. Assert no BTC participant has refunded before ITS OWN locktime.
     //   2. Wait for all participants at this distance to reach Refunded.
     //   3. Mine 1 block to open the next distance's BTC window (skip after last iteration).
     //
     // Cardano windows open by real time (distance * 60s); no extra mining needed for them.
+    //
+    // NOTE: the test does NOT control the block height. The environment's
+    // auto-mining service mines a block for every transaction it sees on ZMQ, so
+    // lock and refund broadcasts advance the chain on their own — runs have been
+    // observed ending 7 blocks ahead while the test itself mined only 3. With
+    // blocks_per_window = 1 the windows are a single block apart, so a
+    // higher-distance window can legitimately open earlier than this loop
+    // reaches it. Asserting "nobody beyond `dist` has refunded" therefore fails
+    // intermittently for a correct daemon. Instead we read the real height and
+    // assert the property that actually matters: nobody refunds before their own
+    // locktime.
     for dist in 1u32..=3 {
         // Give the daemon a moment to react to the current chain state before asserting.
         sleep(Duration::from_millis(500)).await;
 
-        // Assert BTC participants at higher distances have not yet refunded.
-        // At this point height = start_block + dist, so their locktimes are strictly in the future.
-        for &id in sorted_non_leaders.iter().filter(|&&id| {
-            participants[&id].blockchain == Blockchain::Bitcoin && distances[&id] > dist
-        }) {
-            let has_refunded = daemon_map[&id]
-                .read()
-                .await
-                .sessions
-                .get(&1)
-                .unwrap()
-                .state_history
-                .contains(&SwapState::Refunded);
-            assert!(
-                !has_refunded,
-                "P{id} (BTC, dist={}) should not have refunded before distance {} window opens",
-                distances[&id],
-                dist + 1
-            );
+        let height = bitcoin_rpc("getblockcount", serde_json::json!([]))
+            .await
+            .as_u64()
+            .unwrap() as u32;
+
+        for &id in sorted_non_leaders
+            .iter()
+            .filter(|&&id| participants[&id].blockchain == Blockchain::Bitcoin)
+        {
+            let guard = daemon_map[&id].read().await;
+            let session = guard.sessions.get(&1).unwrap();
+            let locktime = refund_locktime_btc(session, id);
+            let has_refunded = session.state_history.contains(&SwapState::Refunded);
+            drop(guard);
+
+            // Only meaningful while the window is still shut. Once height has
+            // reached the locktime, refunding is correct behaviour, whoever
+            // mined the blocks that got us there.
+            if height < locktime {
+                assert!(
+                    !has_refunded,
+                    "P{id} (BTC, dist={}) refunded before its own locktime \
+                     (locktime={locktime}, height={height})",
+                    distances[&id]
+                );
+            }
         }
 
         // Wait for every non-leader at this distance to reach Refunded.

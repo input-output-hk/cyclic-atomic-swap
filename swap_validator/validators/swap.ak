@@ -4,7 +4,9 @@ use cardano/transaction.{OutputReference, Transaction}
 
 pub type SwapDatum {
   aggregate_pubkey: ByteArray,
-  refund_slot: Int,
+  /// Refund deadline as POSIX time in milliseconds, not a slot number:
+  /// `validity_range` is POSIX ms, so a slot here makes the guard below vacuous.
+  refund_posix_ms: Int,
 }
 
 pub type SwapRedeemer {
@@ -29,7 +31,7 @@ validator swap {
         )
       Refund { signature } -> {
         expect Finite(lower) = self.validity_range.lower_bound.bound_type
-        expect lower >= d.refund_slot
+        expect lower >= d.refund_posix_ms
         let refund_msg =
           builtin.blake2b_256(
             builtin.cons_bytearray(1, utxo.transaction_id),

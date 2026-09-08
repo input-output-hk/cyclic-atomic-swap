@@ -1,0 +1,231 @@
+services:
+  # =============================================================================
+  # Bitcoin Node (Regtest)
+  # =============================================================================
+  bitcoin-node:
+    build:
+      context: ./docker/bitcoin
+      dockerfile: Dockerfile
+    container_name: bitcoin-node
+    hostname: bitcoin-node
+    ports:
+      - "${BITCOIN_RPC_PORT:-18443}:18443"
+      - "${BITCOIN_P2P_PORT:-18444}:18444"
+      - "${BITCOIN_ZMQ_RAWTX_PORT:-28332}:28332"
+      - "${BITCOIN_ZMQ_HASHBLOCK_PORT:-28333}:28333"
+    volumes:
+      - bitcoin-data:/home/bitcoin/.bitcoin
+    environment:
+      - BITCOIN_RPC_USER=${BITCOIN_RPC_USER:-rpcuser}
+      - BITCOIN_RPC_PASSWORD=${BITCOIN_RPC_PASSWORD:-rpcpassword}
+      - BITCOIN_NETWORK=regtest
+    networks:
+      - blockchain-testnet
+    restart: on-failure:${RESTART_MAX_ATTEMPTS:-3}
+    mem_limit: ${BITCOIN_MEMORY_LIMIT:-2048}m
+    cpus: ${BITCOIN_CPU_LIMIT:-1.0}
+    healthcheck:
+      test: ["CMD", "sh", "-c", "bitcoin-cli -regtest getblockchaininfo | grep -q '\"blocks\"' && (bitcoin-cli -regtest listwallets | grep -q test_wallet || bitcoin-cli -regtest loadwallet test_wallet 2>/dev/null || bitcoin-cli -regtest createwallet test_wallet > /dev/null) && (bitcoin-cli -regtest listwallets | grep -q mining_wallet || bitcoin-cli -regtest loadwallet mining_wallet 2>/dev/null || bitcoin-cli -regtest createwallet mining_wallet > /dev/null) || exit 1"]
+      interval: ${HEALTHCHECK_INTERVAL:-10}s
+      timeout: ${HEALTHCHECK_TIMEOUT:-5}s
+      retries: ${HEALTHCHECK_RETRIES:-3}
+      start_period: 30s
+
+  # =============================================================================
+  # Electrs (Bitcoin Indexer)
+  # =============================================================================
+  electrs:
+    build:
+      context: ./docker/electrs
+      dockerfile: Dockerfile
+    container_name: electrs
+    hostname: electrs
+    command:
+      - --network=regtest
+      - --daemon-rpc-addr=bitcoin-node:18443
+      - --http-addr=0.0.0.0:3002
+      - --electrum-rpc-addr=0.0.0.0:50001
+      - --db-dir=/data
+      - --daemon-dir=/root/.bitcoin
+      - --cookie=rpcuser:rpcpassword
+      - --timestamp
+      - -vvv
+    ports:
+      - "${ELECTRS_HTTP_PORT:-3002}:3002"
+      - "${ELECTRS_ELECTRUM_PORT:-50001}:50001"
+    volumes:
+      - electrs-data:/data
+      - bitcoin-data:/root/.bitcoin:ro
+    environment:
+      - ELECTRS_LOG_LEVEL=${ELECTRS_LOG_LEVEL:-info}
+    networks:
+      - blockchain-testnet
+    depends_on:
+      bitcoin-node:
+        condition: service_healthy
+    restart: on-failure:${RESTART_MAX_ATTEMPTS:-3}
+    mem_limit: ${ELECTRS_MEMORY_LIMIT:-1024}m
+    cpus: ${ELECTRS_CPU_LIMIT:-0.5}
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -sf http://localhost:3002/blocks/tip/height | grep -qE '^[0-9]+$$' || exit 1"]
+      interval: ${HEALTHCHECK_INTERVAL:-10}s
+      timeout: ${HEALTHCHECK_TIMEOUT:-5}s
+      retries: ${HEALTHCHECK_RETRIES:-3}
+      start_period: 60s
+
+  # =============================================================================
+  # Cardano Node (Private Testnet)
+  # =============================================================================
+  cardano-node:
+    build:
+      context: ./docker/cardano
+      dockerfile: Dockerfile
+    container_name: cardano-node
+    hostname: cardano-node
+    ports:
+      - "${CARDANO_NODE_PORT:-3001}:3001"
+    volumes:
+      - shared-volume:/shared
+      - cardano-data:/data
+      - cardano-ipc:/ipc
+
+      - ./config/cardano/topology-pool1.json:/shared/node-1-topology.json
+      - ./config/cardano/keys/cold.vkey:/keys/cold.vkey
+      - ./config/cardano/keys/kes.skey:/keys/kes.skey
+      - ./config/cardano/keys/vrf.skey:/keys/vrf.skey
+      - ./config/cardano/keys/funded_address.skey:/keys/funded_address.skey
+      - ./config/cardano/keys/funded_address.vkey:/keys/funded_address.vkey
+      - ./config/cardano/keys/owner-utxo.skey:/keys/owner-utxo.skey
+      - ./config/cardano/keys/owner-utxo.vkey:/keys/owner-utxo.vkey
+      - ./config/cardano/keys/op.cert:/keys/node.cert
+      - ./config/cardano/config-pool1.json:/shared/node-1-config.json.base
+
+      - ./config/genesis/byron/genesis.json:/shared/byron/genesis.json.base
+      - ./config/genesis/shelley/genesis.json:/shared/shelley/genesis.json.base
+      - ./config/genesis/shelley/genesis.alonzo.json:/shared/shelley/genesis.alonzo.json.base
+      - ./config/genesis/shelley/genesis-utxo.addr:/shared/shelley/genesis-utxo.addr
+      - ./config/genesis/shelley/genesis-utxo.skey:/shared/shelley/genesis-utxo.skey
+      - ./config/genesis/shelley/genesis-utxo.vkey:/shared/shelley/genesis-utxo.vkey
+      - ./config/genesis/conway/genesis.conway.json:/shared/conway/genesis.conway.json.base
+    environment:
+      - CARDANO_TESTNET_MAGIC=${CARDANO_TESTNET_MAGIC:-42}
+      - CARDANO_SLOT_LENGTH=${CARDANO_SLOT_LENGTH:-0.1}
+      - CARDANO_EPOCH_LENGTH=${CARDANO_EPOCH_LENGTH:-43200}
+    networks:
+      - blockchain-testnet
+    restart: on-failure:${RESTART_MAX_ATTEMPTS:-3}
+    mem_limit: ${CARDANO_MEMORY_LIMIT:-2048}m
+    cpus: ${CARDANO_CPU_LIMIT:-1.0}
+    healthcheck:
+      test: ["CMD", "cardano-cli", "query", "tip", "--socket-path", "/ipc/node.socket", "--testnet-magic", "42"]
+      interval: ${HEALTHCHECK_INTERVAL:-10}s
+      timeout: ${HEALTHCHECK_TIMEOUT:-5}s
+      retries: ${HEALTHCHECK_RETRIES:-3}
+      start_period: 60s
+
+  # =============================================================================
+  # Dolos (Cardano Indexer)
+  # =============================================================================
+  dolos:
+    build:
+      context: ./docker/dolos
+      dockerfile: Dockerfile
+    container_name: dolos
+    hostname: dolos
+    command: ["daemon", "--config", "/dolos.toml"]
+    ports:
+      - "${DOLOS_API_PORT:-50051}:50051"
+      - "${DOLOS_GRPC_PORT:-50052}:50052"
+    volumes:
+      - shared-volume:/shared
+      - dolos-data:/data
+      - cardano-ipc:/ipc:ro
+      - ./config/cardano:/cardano-config:ro
+      - ./config/dolos/dolos.toml:/dolos.toml
+    environment:
+      - DOLOS_LOG_LEVEL=${DOLOS_LOG_LEVEL:-info}
+      - DOLOS_NODE_SOCKET=/ipc/node.socket
+      - DOLOS_TESTNET_MAGIC=${CARDANO_TESTNET_MAGIC:-42}
+    networks:
+      - blockchain-testnet
+    depends_on:
+      cardano-node:
+        condition: service_healthy
+    restart: on-failure:${RESTART_MAX_ATTEMPTS:-3}
+    mem_limit: ${DOLOS_MEMORY_LIMIT:-1024}m
+    cpus: ${DOLOS_CPU_LIMIT:-0.5}
+
+  # =============================================================================
+  # Auto-Mining Service (Bitcoin)
+  # =============================================================================
+  auto-mining:
+    build:
+      context: ./docker/auto-mining
+      dockerfile: Dockerfile
+    container_name: auto-mining
+    hostname: auto-mining
+    volumes:
+      - ./config/bitcoin-auto-mining.yaml:/config/bitcoin-auto-mining.yaml:ro
+      - bitcoin-data:/bitcoin-data:ro
+    environment:
+      - BITCOIN_ZMQ_HOST=bitcoin-node
+      - BITCOIN_ZMQ_PORT=28332
+      - BITCOIN_RPC_HOST=bitcoin-node
+      - BITCOIN_RPC_PORT=18443
+      - BITCOIN_RPC_COOKIE=/bitcoin-data/regtest/.cookie
+    networks:
+      - blockchain-testnet
+    depends_on:
+      bitcoin-node:
+        condition: service_healthy
+    restart: on-failure:${RESTART_MAX_ATTEMPTS:-3}
+    mem_limit: ${AUTO_MINING_MEMORY_LIMIT:-512}m
+    cpus: ${AUTO_MINING_CPU_LIMIT:-0.25}
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import sys; sys.exit(0)"]
+      interval: ${HEALTHCHECK_INTERVAL:-10}s
+      timeout: ${HEALTHCHECK_TIMEOUT:-5}s
+      retries: ${HEALTHCHECK_RETRIES:-3}
+      start_period: 30s
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  # Bitcoin blockchain data
+  bitcoin-data:
+    driver: local
+    name: ${VOLUME_PREFIX:-btc-env}_bitcoin-data
+
+  # Electrs indexer database
+  electrs-data:
+    driver: local
+    name: ${VOLUME_PREFIX:-btc-env}_electrs-data
+
+  # Cardano blockchain data
+  cardano-data:
+    driver: local
+    name: ${VOLUME_PREFIX:-btc-env}_cardano-data
+
+  # Cardano IPC (Unix socket for node communication)
+  cardano-ipc:
+    driver: local
+    name: ${VOLUME_PREFIX:-btc-env}_cardano-ipc
+
+  # Dolos indexer database
+  dolos-data:
+    driver: local
+    name: ${VOLUME_PREFIX:-btc-env}_dolos-data
+
+  shared-volume: {}
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  blockchain-testnet:
+    name: ${NETWORK_NAME:-blockchain-testnet}
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${NETWORK_SUBNET:-172.28.0.0/16}

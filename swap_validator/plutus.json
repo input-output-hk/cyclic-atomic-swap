@@ -57,7 +57,8 @@
               "$ref": "#/definitions/ByteArray"
             },
             {
-              "title": "refund_slot",
+              "title": "refund_posix_ms",
+              "description": "Refund deadline as POSIX time in milliseconds, not a slot number:\n `validity_range` is POSIX ms, so a slot here makes the guard below vacuous.",
               "$ref": "#/definitions/Int"
             }
           ]

@@ -4,10 +4,27 @@
 # Open http://localhost:5173 (npm run dev in the dashboard directory) to
 # watch the swap ring and state transitions live. The dashboard stays
 # alive for 120 s after each test completes.
+#
+# The dockerised Bitcoin + Cardano network lives in test-env/ at the root of
+# this repository. Set TESTENV_DIR to override that location.
 set -e
 
-TESTENV="$(dirname "${BASH_SOURCE[0]}")/../../../btc-defi-atomic-swaps-test-env"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+TESTENV="${TESTENV_DIR:-$REPO_ROOT/test-env}"
 DOLOS_REST_URL=http://localhost:50051
+
+if [ ! -x "$TESTENV/testenv" ]; then
+    cat >&2 <<EOF
+error: test network control script not found at
+         $TESTENV/testenv
+
+It should be in test-env/ at the root of this repository; see
+test-env/README.md. Set TESTENV_DIR if you keep it elsewhere.
+
+To run only the tests that need no network:  cargo test
+EOF
+    exit 1
+fi
 
 wait_for_dolos() {
     echo "waiting for Dolos to be ready..."
@@ -31,22 +48,22 @@ wait_for_dolos() {
     echo "warning: Dolos slot did not stabilise after $((40 * 3))s, proceeding anyway"
 }
 
-echo y | $TESTENV/cli/testenv start
+"$TESTENV"/testenv start
 wait_for_dolos
 cargo test --features regtest,dashboard --test completed_regression_test -- --nocapture
 
-echo y | $TESTENV/cli/testenv start
+"$TESTENV"/testenv start
 wait_for_dolos
 cargo test --features regtest,dashboard --test 20_party_completed_regression_test -- --nocapture
 
-echo y | $TESTENV/cli/testenv start
+"$TESTENV"/testenv start
 wait_for_dolos
 cargo test --features regtest,dashboard --test refunded_regression_test -- --nocapture
 
-echo y | $TESTENV/cli/testenv start
+"$TESTENV"/testenv start
 wait_for_dolos
 cargo test --features regtest,dashboard --test failed_regression_test -- --nocapture
 
-echo y | $TESTENV/cli/testenv start
+"$TESTENV"/testenv start
 wait_for_dolos
 cargo test --features regtest --test early_refund_rejection_regression_test -- --nocapture

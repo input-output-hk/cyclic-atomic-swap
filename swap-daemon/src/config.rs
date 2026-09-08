@@ -93,6 +93,31 @@ impl CardanoNetwork {
         }
     }
 
+    /// Returns the network's Shelley genesis `systemStart` in POSIX seconds.
+    ///
+    /// Needed to convert a refund slot into the POSIX-millisecond deadline that
+    /// goes into the lock tx datum: the Plutus script reads
+    /// `validity_range` as POSIX time, so a slot number there would leave the
+    /// refund timelock unenforceable. See
+    /// [`crate::utils::refund_deadline_posix_ms`].
+    ///
+    /// The public networks are fixed points in history, taken from their
+    /// published `shelley-genesis.json`. A private chain stamps a new start on
+    /// every launch, so `Custom` carries the value it was told.
+    pub fn system_start_secs(&self) -> u64 {
+        match self {
+            // 2017-09-23T21:44:51Z
+            CardanoNetwork::Mainnet => 1_506_203_091,
+            // 2022-06-01T00:00:00Z
+            CardanoNetwork::Preprod => 1_654_041_600,
+            // 2022-10-25T00:00:00Z
+            CardanoNetwork::Preview => 1_666_656_000,
+            CardanoNetwork::Custom {
+                system_start_secs, ..
+            } => *system_start_secs,
+        }
+    }
+
     /// Returns the gRPC URL for the `CardanoNetwork` if it is a custom network.
     ///
     /// # Description
