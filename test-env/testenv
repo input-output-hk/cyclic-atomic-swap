@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# Minimal control script for the local Bitcoin + Cardano test network used by
+# the swap-daemon regression tests.
+#
+#   ./testenv start    wipe any existing chain state and bring up a fresh network
+#   ./testenv stop     tear down containers and volumes
+#   ./testenv status   show container health and the chain tips
+#
+# `start` is deliberately destructive: the regression tests mine blocks and
+# submit transactions, so each one needs a clean chain to be reproducible.
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
+DOLOS_REST=http://localhost:50051
+BITCOIN_RPC=http://localhost:18443
+
+compose() { docker compose "$@"; }
+
+wait_for_chains() {
+    echo "waiting for Bitcoin..."
+    local n=0
+    until curl -s -u rpcuser:rpcpassword --data-binary \
+        '{"jsonrpc":"1.0","method":"getblockcount","params":[]}' \
+        "$BITCOIN_RPC" 2>/dev/null | grep -q '"result"'; do
+        n=$((n + 1))
+        if [ $n -gt 60 ]; then echo "error: Bitcoin did not become ready" >&2; return 1; fi
+        sleep 2
+    done
+    echo "Bitcoin ready."
+
+    # Dolos serves nothing until the Cardano node has produced its first block,
+    # so a 503 here means the chain has not started rather than Dolos being down.
+    echo "waiting for Cardano/Dolos..."
+    n=0
+    until curl -sf "$DOLOS_REST/blocks/latest" >/dev/null 2>&1; do
+        n=$((n + 1))
+        if [ $n -gt 90 ]; then
+            echo "error: Dolos did not become ready after 180s — the Cardano node is probably not forging." >&2
+            docker compose logs --tail 20 cardano-node >&2 || true
+            return 1
+        fi
+        sleep 2
+    done
+
+    # The tests read the chain tip as their session anchor, so let it settle
+    # rather than sampling a slot that is still moving.
+    local prev="" cur=""
+    for _ in $(seq 1 40); do
+        cur=$(curl -sf "$DOLOS_REST/blocks/latest" | grep -o '"slot":[0-9]*' | grep -o '[0-9]*$' || true)
+        if [ -n "$cur" ] && [ "$cur" = "$prev" ]; then
+            echo "Cardano ready at slot $cur."
+            return 0
+        fi
+        prev="$cur"
+        sleep 3
+    done
+    echo "warning: chain tip did not settle; continuing anyway" >&2
+}
+
+case "${1:-}" in
+    start)
+        echo "tearing down any existing network (this deletes chain state)..."
+        compose down -v --remove-orphans >/dev/null 2>&1 || true
+        echo "building and starting..."
+        compose up -d --build
+        wait_for_chains
+        echo
+        echo "  Bitcoin RPC     http://localhost:18443  (rpcuser/rpcpassword)"
+        echo "  Electrs REST    http://localhost:3002"
+        echo "  Dolos REST      http://localhost:50051"
+        echo "  Dolos gRPC      http://localhost:50052"
+        ;;
+    stop)
+        compose down -v --remove-orphans
+        echo "stopped; volumes removed."
+        ;;
+    status)
+        compose ps
+        echo
+        printf "bitcoin height : "
+        curl -s -u rpcuser:rpcpassword --data-binary \
+            '{"jsonrpc":"1.0","method":"getblockcount","params":[]}' \
+            "$BITCOIN_RPC" 2>/dev/null | grep -o '"result":[0-9]*' | cut -d: -f2 || echo "unavailable"
+        printf "cardano tip    : "
+        curl -sf "$DOLOS_REST/blocks/latest" 2>/dev/null \
+            | grep -o '"slot":[0-9]*' | cut -d: -f2 || echo "unavailable"
+        ;;
+    *)
+        echo "usage: ./testenv {start|stop|status}" >&2
+        exit 1
+        ;;
+esac

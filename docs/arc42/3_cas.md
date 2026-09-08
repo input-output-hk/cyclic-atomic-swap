@@ -59,7 +59,7 @@ C4Context
 
 
     System_Boundary(blockchain_environment, "Blockchain Environment") {
-        Container_Boundary(btc_defi_atomic_swaps_test_env, "BTC DeFi Test Rig",, "https://github.com/input-output-hk/btc-defi-atomic-swaps-test-env") {
+        Container_Boundary(test_env, "BTC DeFi Test Rig",, "test-env/") {
             ContainerDb(bitcoin, "Bitcoin", "Docker Container", "Blockchain")
             ContainerDb(cardano, "Cardano", "Docker Container", "Blockchain")
         }
@@ -108,7 +108,7 @@ C4Container
             }
         }
         System_Boundary(blockchain_environment, "Blockchain Environment") {
-            Container_Boundary(btc_defi_atomic_swaps_test_env, "BTC DeFi Test Rig",, "https://github.com/input-output-hk/btc-defi-atomic-swaps-test-env") {
+            Container_Boundary(test_env, "BTC DeFi Test Rig",, "test-env/") {
                 ContainerDb(bitcoin, "Bitcoin", "Docker Container", "Blockchain")
                 ContainerDb(cardano, "Cardano", "Docker Container", "Blockchain")
             }

@@ -390,16 +390,11 @@ DaemonConfig {
 - Docker + Docker Compose
 - Aiken (for contract compilation)
 
-### Start the Private Network
+### Start the Test Network
 
-The regression suite runs against a dockerised Bitcoin + Cardano network provided by the
-`btc-defi-atomic-swaps-test-env` repository.
-
-> **⚠️ Access note:** `input-output-hk/btc-defi-atomic-swaps-test-env` is currently an
-> **IOG-internal repository**. Without access to it the regression suite in
-> [Regression Tests](#regression-tests) cannot be run. Everything under
-> [Tests that need no private network](#tests-that-need-no-private-network) runs from this
-> repository alone. To request access, open an issue on this repository.
+The regression suite runs against a dockerised Bitcoin + Cardano network that lives in
+[`test-env/`](../test-env) at the root of this repository. Nothing outside this repository is
+needed — see [test-env/README.md](../test-env/README.md).
 
 The environment provides five containers and exposes them on fixed localhost ports, which the
 regression tests hardcode:
@@ -412,29 +407,24 @@ regression tests hardcode:
 | `dolos` (Cardano indexer)      | 50051 (REST), 50052 (gRPC) | chain tip, UTXO queries, tx submission |
 | `auto-mining`                  | —             | mining a Bitcoin block per detected tx      |
 
-Clone it and start the network:
+Start the network:
 
 ```bash
-git clone git@github.com:input-output-hk/btc-defi-atomic-swaps-test-env.git
-cd btc-defi-atomic-swaps-test-env
-./cli/testenv start
-./cli/testenv status
+cd ../test-env
+./testenv start     # fresh chain; destroys any existing state
+./testenv status
 ```
 
-First start takes 2–5 minutes; subsequent starts 30–45 seconds.
+First start takes 2–5 minutes while the images build; later starts 30–60 seconds.
 
-`scripts/reg_suite.sh` needs to know where that clone lives. It defaults to a sibling directory of
-this repository (`../btc-defi-atomic-swaps-test-env`); anywhere else, set `TESTENV_DIR`:
-
-```bash
-export TESTENV_DIR=/path/to/btc-defi-atomic-swaps-test-env
-```
+`scripts/reg_suite.sh` finds it at `test-env/` automatically. Set `TESTENV_DIR` only if you keep it
+somewhere else.
 
 ---
 
 ## Running Tests
 
-### Tests that need no private network
+### Tests that need no network
 
 These run from a clean clone of this repository with only a Rust toolchain — no Docker, no
 credentials, no access to any other repository. The regtest and preprod tests are annotated
@@ -448,10 +438,10 @@ cargo test
 cargo test --test spend_tx_integration_test
 ```
 
-### Tests that need the private network
+### Tests that need the local test network
 
 ```bash
-# all regression tests against the private network (see Regression Tests section below)
+# all regression tests against the local test network (see Regression Tests below)
 ./scripts/reg_suite.sh
 ```
 
@@ -466,9 +456,9 @@ BLOCKFROST_API_KEY=<key> cargo test --test preprod_integration_test -- --ignored
 
 ### Regression Tests
 
-The regression tests run against the private network (Bitcoin regtest + Dolos). Each test spins up multiple daemon instances in-process, connects them over TCP, and drives the full swap protocol from start to finish — including chain interaction.
+The regression tests run against the local test network (Bitcoin regtest + Dolos). Each test spins up multiple daemon instances in-process, connects them over TCP, and drives the full swap protocol from start to finish — including chain interaction.
 
-**Prerequisites:** the private network must be running before each test (`./cli/testenv start`). The environment is stateful: each test mines blocks, submits transactions, and leaves the chain in a new state, so the environment should be restarted between tests to ensure a clean baseline. `reg_suite.sh` handles this automatically.
+**Prerequisites:** the test network must be running before each test (`test-env/testenv start`). The environment is stateful: each test mines blocks, submits transactions, and leaves the chain in a new state, so the environment should be restarted between tests to ensure a clean baseline. `reg_suite.sh` handles this automatically.
 
 | Test file                                    | Participants | Scenario                                                               |
 | -------------------------------------------- | ------------ | ---------------------------------------------------------------------- |
@@ -481,7 +471,7 @@ The regression tests run against the private network (Bitcoin regtest + Dolos). 
 **Run a single test:**
 
 ```bash
-$TESTENV_DIR/cli/testenv start
+../test-env/testenv start
 cargo test --features regtest --test completed_regression_test -- --nocapture
 ```
 
@@ -512,7 +502,7 @@ npm run dev
 ```bash
 ./scripts/reg_suite.sh
 # or individually:
-$TESTENV_DIR/cli/testenv start
+../test-env/testenv start
 cargo test --features "regtest,dashboard" --test completed_regression_test -- --nocapture
 ```
 

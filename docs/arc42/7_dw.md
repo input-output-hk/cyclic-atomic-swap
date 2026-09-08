@@ -79,19 +79,16 @@ The reference implementation includes a demo/test rig running all daemons in the
 and running two containers, one for Bitcoin and one for Cardano.
 
 The containers for Bitcoin and Cardano are published in the 
-[btc-defi-atomic-swaps-test-env](https://github.com/input-output-hk/btc-defi-atomic-swaps-test-env) repository.
-
-> **Note:** that repository is currently IOG-internal, so the link above resolves only for accounts
-> with access. The regression suite it drives is documented in
-> [swap-daemon/README.md](../../swap-daemon/README.md#regression-tests), which also lists the tests
-> that run from this repository alone. Open an issue on this repository to request access.
+[test-env/](../../test-env) directory of this repository, so the regression suite it drives needs
+no other repository. See [test-env/README.md](../../test-env/README.md) for how to run it, and
+[swap-daemon/README.md](../../swap-daemon/README.md#regression-tests) for the tests themselves.
 
 ```mermaid
 C4Deployment
     title "Figure 2: Reference Implementation Test/Rig"
     Enterprise_Boundary(rig, "Demo/Test Rig") {
         Deployment_Node(runtime, "Runtime Environment", "OS") {
-            Deployment_Node(btc-defi-atomic-swaps-test-env, "https://github.com/input-output-hk/btc-defi-atomic-swaps-test-env", "repository") {
+            Deployment_Node(test_env, "test-env/", "directory") {
                 Deployment_Node(bitcoin_node, "Bitcoin Node", "Container") {
                     ContainerDb(bitcoin, "Bitcoin", "blockchain")
                 }

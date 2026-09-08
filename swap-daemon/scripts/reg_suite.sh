@@ -5,29 +5,23 @@
 # watch the swap ring and state transitions live. The dashboard stays
 # alive for 120 s after each test completes.
 #
-# The blockchain test environment lives in a separate repository
-# (input-output-hk/btc-defi-atomic-swaps-test-env, currently IOG-internal).
-# Set TESTENV_DIR to point at your clone; it defaults to a sibling directory
-# of this repository.
+# The dockerised Bitcoin + Cardano network lives in test-env/ at the root of
+# this repository. Set TESTENV_DIR to override that location.
 set -e
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-TESTENV="${TESTENV_DIR:-$REPO_ROOT/../btc-defi-atomic-swaps-test-env}"
+TESTENV="${TESTENV_DIR:-$REPO_ROOT/test-env}"
 DOLOS_REST_URL=http://localhost:50051
 
-if [ ! -x "$TESTENV/cli/testenv" ]; then
+if [ ! -x "$TESTENV/testenv" ]; then
     cat >&2 <<EOF
-error: blockchain test environment not found at
-         $TESTENV
+error: test network control script not found at
+         $TESTENV/testenv
 
-The regression suite needs the dockerised Bitcoin + Cardano network from
-input-output-hk/btc-defi-atomic-swaps-test-env (currently an IOG-internal
-repository — open an issue on this repository to request access).
+It should be in test-env/ at the root of this repository; see
+test-env/README.md. Set TESTENV_DIR if you keep it elsewhere.
 
-  git clone git@github.com:input-output-hk/btc-defi-atomic-swaps-test-env.git
-  export TESTENV_DIR=/path/to/btc-defi-atomic-swaps-test-env
-
-Without it, run the tests that need no private network:  cargo test
+To run only the tests that need no network:  cargo test
 EOF
     exit 1
 fi
@@ -54,22 +48,22 @@ wait_for_dolos() {
     echo "warning: Dolos slot did not stabilise after $((40 * 3))s, proceeding anyway"
 }
 
-echo y | $TESTENV/cli/testenv start
+"$TESTENV"/testenv start
 wait_for_dolos
 cargo test --features regtest,dashboard --test completed_regression_test -- --nocapture
 
-echo y | $TESTENV/cli/testenv start
+"$TESTENV"/testenv start
 wait_for_dolos
 cargo test --features regtest,dashboard --test 20_party_completed_regression_test -- --nocapture
 
-echo y | $TESTENV/cli/testenv start
+"$TESTENV"/testenv start
 wait_for_dolos
 cargo test --features regtest,dashboard --test refunded_regression_test -- --nocapture
 
-echo y | $TESTENV/cli/testenv start
+"$TESTENV"/testenv start
 wait_for_dolos
 cargo test --features regtest,dashboard --test failed_regression_test -- --nocapture
 
-echo y | $TESTENV/cli/testenv start
+"$TESTENV"/testenv start
 wait_for_dolos
 cargo test --features regtest --test early_refund_rejection_regression_test -- --nocapture
