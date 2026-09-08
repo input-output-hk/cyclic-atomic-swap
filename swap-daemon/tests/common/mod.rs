@@ -146,3 +146,25 @@ pub fn leader_id(daemon: &Daemon) -> u8 {
         .leader
         .expect("no leader computed")
 }
+
+/// Fetches the Cardano network start time (POSIX seconds) from the indexer's
+/// `/genesis` endpoint (Dolos and Blockfrost both expose `system_start`).
+///
+/// Regtest sessions must set `SwapSession::cardano_system_start_secs` from this
+/// before building lock txs: the datum's refund deadline is POSIX milliseconds,
+/// derived from the network start, and
+/// `swap_daemon::utils::refund_deadline_posix_ms` panics if it is left unset.
+pub async fn get_cardano_system_start(dolos_rest_url: &str) -> u64 {
+    let url = format!("{dolos_rest_url}/genesis");
+    let v: serde_json::Value = reqwest::get(&url)
+        .await
+        .expect("dolos /genesis request failed")
+        .json()
+        .await
+        .expect("invalid JSON from dolos /genesis");
+    let system_start = v["system_start"]
+        .as_u64()
+        .expect("dolos /genesis has no numeric system_start");
+    assert!(system_start > 0, "dolos reported system_start = 0");
+    system_start
+}

@@ -20,7 +20,7 @@
 // in the future).
 //
 // Prerequisites:
-//   ./cli/testenv start
+//   ../test-env/testenv start
 //
 // Run with:
 //   cargo test --features regtest,dashboard --test refunded_regression_test -- --nocapture
@@ -457,13 +457,14 @@ async fn setup_cardano_utxos(config: &DaemonConfig) -> FundingInfo {
 // Config and state polling helpers
 // =============================================================================
 
-fn make_regtest_config(tcp_address: &str) -> DaemonConfig {
+fn make_regtest_config(tcp_address: &str, system_start_secs: u64) -> DaemonConfig {
     DaemonConfig {
         tcp_address: tcp_address.to_string(),
         bitcoin_network: BitcoinNetwork::Custom(ELECTRS_URL.to_string()),
         cardano_network: CardanoNetwork::Custom {
             grpc_url: DOLOS_GRPC_URL.to_string(),
             rest_url: DOLOS_REST_URL.to_string(),
+            system_start_secs,
         },
         blockfrost_api_key: "".to_string(),
         validate_utxos: false,
@@ -522,7 +523,8 @@ async fn four_party_cross_chain_refund_when_leader_absent() {
     // at a time and assert that higher-distance BTC participants have not yet
     // refunded before their window opens.
 
-    let config = make_regtest_config(P1_TCP_ADDR);
+    let cardano_system_start = common::get_cardano_system_start(DOLOS_REST_URL).await;
+    let config = make_regtest_config(P1_TCP_ADDR, cardano_system_start);
 
     info!("=== Setting up Cardano UTxOs ===");
     let funding = setup_cardano_utxos(&config).await;
@@ -644,22 +646,22 @@ async fn four_party_cross_chain_refund_when_leader_absent() {
 
     info!("=== Initializing daemons ===");
     let d1: Arc<tokio::sync::RwLock<Daemon>> = Arc::new(tokio::sync::RwLock::new({
-        let mut daemon = Daemon::new(make_p1_keys(), make_regtest_config(P1_TCP_ADDR));
+        let mut daemon = Daemon::new(make_p1_keys(), make_regtest_config(P1_TCP_ADDR, cardano_system_start));
         daemon.insert_session(make_session(1));
         daemon
     }));
     let d2: Arc<tokio::sync::RwLock<Daemon>> = Arc::new(tokio::sync::RwLock::new({
-        let mut daemon = Daemon::new(make_p2_keys(), make_regtest_config(P2_TCP_ADDR));
+        let mut daemon = Daemon::new(make_p2_keys(), make_regtest_config(P2_TCP_ADDR, cardano_system_start));
         daemon.insert_session(make_session(2));
         daemon
     }));
     let d3: Arc<tokio::sync::RwLock<Daemon>> = Arc::new(tokio::sync::RwLock::new({
-        let mut daemon = Daemon::new(make_p3_keys(), make_regtest_config(P3_TCP_ADDR));
+        let mut daemon = Daemon::new(make_p3_keys(), make_regtest_config(P3_TCP_ADDR, cardano_system_start));
         daemon.insert_session(make_session(3));
         daemon
     }));
     let d4: Arc<tokio::sync::RwLock<Daemon>> = Arc::new(tokio::sync::RwLock::new({
-        let mut daemon = Daemon::new(make_p4_keys(), make_regtest_config(P4_TCP_ADDR));
+        let mut daemon = Daemon::new(make_p4_keys(), make_regtest_config(P4_TCP_ADDR, cardano_system_start));
         daemon.insert_session(make_session(4));
         daemon
     }));

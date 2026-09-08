@@ -12,7 +12,7 @@ use crate::{
     },
     networking::broadcast,
     types::{BitcoinNetwork, Blockchain, CardanoNetwork, DaemonConfig, Envelope, SwapKeys, SwapSession, WireMessage},
-    utils::{get_my_id, get_other_addresses, refund_locktime_cardano},
+    utils::{get_my_id, get_other_addresses, refund_deadline_posix_ms},
 };
 
 /// Builds lock transactions for all participants in a swap session.
@@ -67,7 +67,10 @@ pub fn build_lock_txs(session: &mut SwapSession, config: &DaemonConfig) {
                     .insert(*participant_id, serialize_hex(&lock_tx));
             }
             Blockchain::Cardano => {
-                let refund_slot = refund_locktime_cardano(session, *participant_id);
+                // POSIX milliseconds, not a slot: the Plutus script compares this
+                // against `validity_range.lower_bound`, which the ledger supplies
+                // as POSIX time. See `refund_deadline_posix_ms`.
+                let refund_deadline_ms = refund_deadline_posix_ms(session, *participant_id, &config.cardano_network);
                 let lock_tx = cardano_utils::build_lock_tx(
                     &participant.funding_utxo_txid,
                     participant.funding_utxo_vout,
@@ -75,7 +78,7 @@ pub fn build_lock_txs(session: &mut SwapSession, config: &DaemonConfig) {
                     &agg_pubkey,
                     session.cardano_fee,
                     cardano_network_byte,
-                    refund_slot,
+                    refund_deadline_ms,
                 );
                 // serialize cardano tx differently
                 session

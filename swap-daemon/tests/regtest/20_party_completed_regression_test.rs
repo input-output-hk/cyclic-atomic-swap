@@ -4,7 +4,7 @@
 // 10 Bitcoin participants (odd IDs) and 10 Cardano participants (even IDs).
 // P2 is the testenv genesis wallet (pre-funded). All others are funded at test start.
 //
-// Prerequisites: ./cli/testenv start
+// Prerequisites: ../test-env/testenv start
 // Run: cargo test --features regtest --test 20_party_completed_regression_test -- --nocapture
 
 use std::collections::{BTreeMap, HashMap};
@@ -497,13 +497,14 @@ fn make_collaterals(setup_txid: &str) -> HashMap<u8, CardanoCollateral> {
     map
 }
 
-fn make_regtest_config(tcp_address: &str) -> DaemonConfig {
+fn make_regtest_config(tcp_address: &str, system_start_secs: u64) -> DaemonConfig {
     DaemonConfig {
         tcp_address: tcp_address.to_string(),
         bitcoin_network: BitcoinNetwork::Custom(ELECTRS_URL.to_string()),
         cardano_network: CardanoNetwork::Custom {
             grpc_url: DOLOS_GRPC_URL.to_string(),
             rest_url: DOLOS_REST_URL.to_string(),
+            system_start_secs,
         },
         blockfrost_api_key: "".to_string(),
         validate_utxos: true,
@@ -576,6 +577,7 @@ async fn twenty_party_swap_over_tcp() {
         .as_u64()
         .unwrap() as u32;
     let cardano_start_slot = get_dolos_tip_slot().await;
+    let cardano_system_start = common::get_cardano_system_start(DOLOS_REST_URL).await;
     info!("btc_start_block={btc_start_block}, cardano_start_slot={cardano_start_slot}");
 
     info!("=== Initializing {} daemons ===", N);
@@ -595,7 +597,7 @@ async fn twenty_party_swap_over_tcp() {
     let daemons: Vec<Arc<tokio::sync::RwLock<Daemon>>> = (1..=N)
         .map(|id| {
             let addr = tcp_addr(id);
-            let mut daemon = Daemon::new(make_keys_for(id), make_regtest_config(&addr));
+            let mut daemon = Daemon::new(make_keys_for(id), make_regtest_config(&addr, cardano_system_start));
             daemon.insert_session(make_session(id));
             Arc::new(tokio::sync::RwLock::new(daemon))
         })

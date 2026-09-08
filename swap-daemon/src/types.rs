@@ -404,8 +404,26 @@ pub struct Participant {
 pub struct SwapSession {
     pub id: SessionId,
     pub participants: Participants,
-    pub start_block: u32, // Bitcoin block height at session creation
-    pub start_slot: u64,  // Cardano slot at session creation
+    /// Bitcoin block height at session creation — the anchor from which every
+    /// participant's Bitcoin refund locktime is derived
+    /// ([`crate::utils::refund_locktime_btc`]). Stays a block height: `nLockTime`
+    /// is enforced by consensus in block heights.
+    pub start_block: u32,
+    /// Cardano slot at session creation — the anchor from which every
+    /// participant's Cardano refund locktime is derived
+    /// ([`crate::utils::refund_locktime_cardano`]).
+    ///
+    /// Deliberately a **slot**, and not interchangeable with
+    /// [`Self::cardano_system_start_secs`]. The derived locktime is used where
+    /// the chain speaks slots: as a refund tx's `validity_start_interval`
+    /// (enforced by the ledger in phase 1) and when comparing against the node's
+    /// current tip slot. Only the datum's deadline is converted to POSIX
+    /// milliseconds, by [`crate::utils::refund_deadline_posix_ms`], because that
+    /// value is read by the Plutus script rather than by the ledger.
+    ///
+    /// This is per-session (where this swap began); the network start below is a
+    /// per-network constant.
+    pub start_slot: u64,
     pub state: SwapState,
     pub state_history: Vec<SwapState>,
     pub bitcoin_fee: u64,
@@ -598,7 +616,17 @@ pub enum CardanoNetwork {
     Mainnet,
     Preprod,
     Preview,
-    Custom { grpc_url: String, rest_url: String }, // ← local/private network (Dolos)
+    /// Local/private network served by Dolos.
+    ///
+    /// `system_start_secs` is the network's Shelley genesis `systemStart` in
+    /// POSIX seconds, which the public networks carry as constants (see
+    /// [`CardanoNetwork::system_start_secs`]) but a private chain stamps afresh
+    /// on every start. Read it from the indexer's `/genesis` endpoint.
+    Custom {
+        grpc_url: String,
+        rest_url: String,
+        system_start_secs: u64,
+    },
 }
 
 /// Represents the cryptographic keys required for a swap transaction.
